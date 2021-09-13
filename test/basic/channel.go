@@ -24,14 +24,14 @@ func sum(s []int, c chan int) {
 func main() {
 	s := []int{7, 2, 8, -9, 4, 0}
 
-	c := make(chan int)
-	d := make(chan string)
+	channel := make(chan int)
+	boundedChan := make(chan string, 10)
 
-	go sum(s[:len(s)/2], c)
-	go sum(s[len(s)/2:], c)
-	x, y := <-c, <-c // Receive from c
+	go sum(s, channel)
+	go sum(s[len(s)/2:], channel)
+	x, y := <-channel, <-channel // Receive from c
 
-	close(c)
+	close(channel)
 
 	fmt.Println(x, y, x+y)
 }
