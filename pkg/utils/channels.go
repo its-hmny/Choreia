@@ -30,7 +30,8 @@ func ExtrapolateChanMetadata(stmt *ast.AssignStmt) ([]ChannelMetadata, error) {
 	// Check that the number of rvalues (variable assigned) are the same of
 	// lvalues (values assignments) in the statement (TODO TEST)
 	if len(stmt.Lhs) != len(stmt.Rhs) {
-		return nil, errors.New("ExtrapolateChanMetadata: should receive same number of l_val and r_val")
+		err := errors.New("ExtrapolateChanMetadata: should receive same number of l_val and r_val")
+		return nil, err
 	}
 
 	// Now iterates over the assignment statements

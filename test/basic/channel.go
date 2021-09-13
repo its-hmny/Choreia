@@ -29,6 +29,11 @@ func main() {
 
 	go sum(s, channel)
 	go sum(s[len(s)/2:], channel)
+
+	go func(x int) {
+		fmt.Println("Hello from anonymous function")
+	}(3)
+
 	x, y := <-channel, <-channel // Receive from c
 
 	close(channel)
