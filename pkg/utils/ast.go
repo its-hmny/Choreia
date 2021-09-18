@@ -42,6 +42,10 @@ func (fm fileMetadata) Visit(node ast.Node) ast.Visitor {
 		newChannels := GetChanMetadata(stmt)
 		fm.AddChannels(newChannels)
 		return nil
+	case *ast.FuncDecl:
+		newFunction := GetFunctionMetadata(stmt)
+		fmt.Printf("GteFunctionMetadata output: %+v \n", newFunction)
+		return nil
 	// Error handling case
 	case *ast.BadDecl, *ast.BadExpr, *ast.BadStmt:
 		log.Fatalf("Syntax error at line %d, column %d\n", node.Pos(), node.End())

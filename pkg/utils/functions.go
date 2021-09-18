@@ -1,11 +1,69 @@
 package utils
 
 import (
-	"errors"
 	"fmt"
 	"go/ast"
 )
 
+const (
+	Spawn   uint = 0
+	Send         = 1
+	Receive      = 2
+	Call         = 3
+)
+
+type TransactionPayload interface {
+	// TODO
+}
+
+type Transaction struct {
+	category uint
+	buffer   TransactionPayload
+	from     uint
+	to       uint
+}
+
+type FunctionMetadata struct {
+	name        string
+	transaction []Transaction
+}
+
+func GetFunctionMetadata(stmt *ast.FuncDecl) FunctionMetadata {
+	funcName := stmt.Name.Name
+	funcArgs := stmt.Type.Params.List
+	fmt.Printf("DEBUG function name %s \n", funcName)
+
+	// The function has arguments
+	if len(funcArgs) > 0 {
+		for _, arg := range funcArgs {
+			// Extrapolates the argument name and type
+			argName := arg.Names[0].Name
+			chanArg, isChannel := arg.Type.(*ast.ChanType)
+			funcArg, isFunction := arg.Type.(*ast.FuncType)
+
+			// We're interested only in function and channel passed as arguments
+			if isChannel {
+				chanType := chanArg.Value.(*ast.Ident).Name
+				fmt.Printf("  DEBUG channel argument (%s,%s) \n", argName, chanType)
+			}
+
+			// We're interested only in function and channel passed as arguments
+			if isFunction {
+				// TODO
+				fmt.Printf("  DEBUG function argument (%s,%+v) \n", argName, funcArg)
+			}
+		}
+	}
+
+	// The function has a return type
+	if stmt.Type.Results != nil {
+		returnVals := stmt.Type.Results.List
+		fmt.Printf("  DEBUG return type %+v \n", returnVals[0])
+	}
+	return FunctionMetadata{"", nil}
+}
+
+/*
 const ANONYMOUS_IDENT = "anonymous"
 
 var latestUid uint = 0 // Uid = 0 is always taken by main
@@ -22,7 +80,7 @@ type GoRoutineMetadata struct {
 type FunctionMetadata struct {
 }
 
-func GetGoRoutineMetadata(stmt *ast.GoStmt /*, parentMetadata GoRoutineMetadata*/) (GoRoutineMetadata, error) {
+func GetGoRoutineMetadata(stmt *ast.GoStmts) (GoRoutineMetadata, error) {
 	latestUid += 1 // Generates a new Uid
 	metadata := GoRoutineMetadata{goRoutineUid: latestUid}
 
@@ -64,4 +122,4 @@ func GetGoRoutineMetadata(stmt *ast.GoStmt /*, parentMetadata GoRoutineMetadata*
 	}
 
 	return metadata, nil
-}
+}*/
