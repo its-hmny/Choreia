@@ -12,13 +12,20 @@ ch <- v    // Send v to channel ch.
 v := <-ch  // Receive from ch, and assign value to v.
 */
 
-func sum(s []int, c chan int) {
+var global = make(chan int, 1)
+
+func test(callback func(int) int, channel chan int) int {
+	return (callback(<-channel))
+}
+
+func sum(s []int, c chan int) int {
 	accumulator := 0
 	for _, v := range s {
 		accumulator += v
 	}
 	// Send accumulator to c
 	c <- accumulator
+	return 0
 }
 
 func main() {
@@ -34,6 +41,7 @@ func main() {
 		fmt.Println("Hello from anonymous function")
 	}(3)
 
+	<-boundedChan
 	x, y := <-channel, <-channel // Receive from c
 
 	close(channel)
