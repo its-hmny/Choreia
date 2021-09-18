@@ -15,8 +15,11 @@ var latestUid uint = 0 // Uid = 0 is always taken by main
 type GoRoutineMetadata struct {
 	goRoutineUid uint
 	name         string
-	avaiableChan []ChannelMetadata
-	//transition   []int
+	// avaiableChan []ChannelMetadata
+	// transition   []int
+}
+
+type FunctionMetadata struct {
 }
 
 func GetGoRoutineMetadata(stmt *ast.GoStmt /*, parentMetadata GoRoutineMetadata*/) (GoRoutineMetadata, error) {
