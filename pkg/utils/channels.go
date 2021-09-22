@@ -45,6 +45,59 @@ func GetChanMetadata(node ast.Node) []ChannelMetadata {
 	return nil
 }
 
+// TODO COMMENT
+//
+//
+func GetSendTransaction(stmt *ast.SendStmt) (Transaction, error) {
+	chanIdent, isIdent := stmt.Chan.(*ast.Ident)
+	if isIdent {
+		return Transaction{Send, chanIdent.Name, Unknown, Unknown}, nil
+	}
+	return Transaction{}, errors.New("GetSendTransaction: the channel isn't an identifier")
+}
+
+// TODO COMMENT
+//
+//
+func GetRecvTransaction(stmt ast.Stmt) ([]Transaction, error) {
+	parsed := []Transaction{}
+	switch typedStmt := stmt.(type) {
+	case *ast.AssignStmt:
+		for _, rValue := range typedStmt.Rhs {
+			transaction := parseSendExpr(rValue)
+			if transaction.from == transaction.to {
+				continue
+			}
+			parsed = append(parsed, transaction)
+		}
+	case *ast.ExprStmt:
+		transaction := parseSendExpr(typedStmt.X)
+		if transaction.from == transaction.to {
+			return []Transaction{}, nil
+		}
+		parsed = append(parsed, transaction)
+	}
+
+	return parsed, nil
+}
+
+// TODO COMMENT
+//
+//
+func parseSendExpr(expr ast.Expr) Transaction {
+	unaryExpr, isUnaryExpr := expr.(*ast.UnaryExpr)
+	if !isUnaryExpr || unaryExpr.Op != token.ARROW {
+		return Transaction{}
+	}
+
+	chanIdent, isIdent := unaryExpr.X.(*ast.Ident)
+	if !isIdent {
+		return Transaction{}
+	}
+	// TODO FIX THIS
+	return Transaction{Send, chanIdent.Name, Unknown, -2}
+}
+
 // Specific function to extrapolate channel metadata from an AssignStmt
 func parseAssignStmt(stmt *ast.AssignStmt) ([]ChannelMetadata, error) {
 	// A Slice containing all the metadata retrieved about the channel declared
