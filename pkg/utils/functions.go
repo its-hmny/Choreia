@@ -8,10 +8,10 @@ import (
 
 const (
 	// Transaction type enum
-	Spawn   = 0
-	Send    = 1
-	Receive = 2
-	Call    = 3
+	Spawn   = "Spawn"
+	Send    = "Send"
+	Receive = "Recv"
+	Call    = "Call"
 
 	// ArgToExpand type enum
 	Function = 0
@@ -22,22 +22,22 @@ const (
 )
 
 type ArgumentToExpand struct {
-	argIndex int
-	argName  string
-	argType  uint
+	ArgIndex int
+	ArgName  string
+	ArgType  uint
 }
 
 type Transaction struct {
-	category  int
-	identName string
-	from      int
-	to        int
+	Category  string
+	IdentName string
+	From      int
+	To        int
 }
 
 type FunctionMetadata struct {
-	name         string
-	inlineArg    []ArgumentToExpand
-	transactions []Transaction
+	Name         string
+	InlineArg    []ArgumentToExpand
+	Transactions []Transaction
 }
 
 func GetFunctionMetadata(stmt *ast.FuncDecl) FunctionMetadata {
@@ -64,13 +64,13 @@ func GetFunctionMetadata(stmt *ast.FuncDecl) FunctionMetadata {
 			// We're interested only in function and channel passed as arguments
 			if isChannel {
 				newInlineArg := ArgumentToExpand{i, argName, Channel}
-				metadata.inlineArg = append(metadata.inlineArg, newInlineArg)
+				metadata.InlineArg = append(metadata.InlineArg, newInlineArg)
 			}
 
 			// We're interested only in function and channel passed as arguments
 			if isFunction {
 				newInlineArg := ArgumentToExpand{i, argName, Function}
-				metadata.inlineArg = append(metadata.inlineArg, newInlineArg)
+				metadata.InlineArg = append(metadata.InlineArg, newInlineArg)
 			}
 		}
 	}
@@ -83,7 +83,7 @@ func GetFunctionMetadata(stmt *ast.FuncDecl) FunctionMetadata {
 		log.Fatalf("%s\n", err)
 	}
 	// Set the list received in the metadata
-	metadata.transactions = transactionList
+	metadata.Transactions = transactionList
 
 	return metadata
 }
@@ -98,20 +98,20 @@ func GetSpawnTransaction(stmt *ast.GoStmt, currentState *int) (Transaction, erro
 	// Populates the metadata accordingly
 	if isFuncIdent {
 		// The avaiable function name is set but doesn't inherit scopes (and channels variables)
-		transaction.identName = funcIdent.Name
+		transaction.IdentName = funcIdent.Name
 		// Add state transaction to the automata fragment for the function
-		transaction.from = *currentState
+		transaction.From = *currentState
 		(*currentState)++
-		transaction.to = *currentState
+		transaction.To = *currentState
 	}
 
 	if isFuncAnonymous {
 		// The function name is a fallback one, but inherits scopes from the parent/caller
-		transaction.identName = AnonymousFunc
+		transaction.IdentName = AnonymousFunc
 		// Add state transaction to the automata fragment for the function
-		transaction.from = *currentState
+		transaction.From = *currentState
 		(*currentState)++
-		transaction.to = *currentState
+		transaction.To = *currentState
 		// TODO Add parent avaiableChan
 		// TODO Add parse arguments (different from above)
 		// TODO Should parse body of funcLiteral (?)
@@ -123,6 +123,10 @@ func GetSpawnTransaction(stmt *ast.GoStmt, currentState *int) (Transaction, erro
 	}
 
 	return transaction, nil
+}
+
+func GetCallTransaction(stmt ast.Stmt, currentState *int) ([]Transaction, error) {
+	return []Transaction{}, nil
 }
 
 func recursiveParseBlockStmt(body *ast.BlockStmt, currentState *int) ([]Transaction, error) {
@@ -151,9 +155,19 @@ func recursiveParseBlockStmt(body *ast.BlockStmt, currentState *int) ([]Transact
 			transactionList = append(transactionList, sendTransaction)
 		// Possibily, receive from channel
 		case *ast.ExprStmt, *ast.AssignStmt:
-			recvTransactions, _ := GetRecvTransaction(blockStmt, currentState)
-			if len(recvTransactions) > 0 {
+			recvTransactions, errRecv := GetRecvTransaction(blockStmt, currentState)
+			callTransactions, errCall := GetCallTransaction(blockStmt, currentState)
+
+			if errRecv != nil {
+				log.Fatalf("%s\n", errRecv)
+			} else if len(recvTransactions) > 0 {
 				transactionList = append(transactionList, recvTransactions...)
+			}
+
+			if errCall != nil {
+				log.Fatalf("%s\n", errRecv)
+			} else if len(recvTransactions) > 0 {
+				transactionList = append(transactionList, callTransactions...)
 			}
 		}
 	}

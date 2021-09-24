@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"encoding/json"
 	"fmt"
 	"go/ast"
 	"log"
@@ -9,8 +10,8 @@ import (
 // A struct containing all the metadata that the algorithm
 // has been able to extrapolate from the parsed file
 type fileMetadata struct {
-	globalChan map[string]ChannelMetadata
-	funcDecl   map[string]FunctionMetadata
+	GlobalChan map[string]ChannelMetadata
+	FuncDecl   map[string]FunctionMetadata
 }
 
 // Adds the given metadata about some channels to the fileMetadata struct
@@ -24,7 +25,7 @@ func (fm *fileMetadata) AddChannels(newChannels []ChannelMetadata) {
 
 	// Adds/updates the associations
 	for _, channel := range newChannels {
-		fm.globalChan[channel.name] = channel
+		fm.GlobalChan[channel.Name] = channel
 	}
 }
 
@@ -35,11 +36,11 @@ func (fm *fileMetadata) AddChannels(newChannels []ChannelMetadata) {
 // TODO CONSIDER OVERLOADED FUNCTION
 func (fm *fileMetadata) AddFunctionMeta(newFuncMeta FunctionMetadata) {
 	// Checks that the data is valid
-	if newFuncMeta.name == "" {
+	if newFuncMeta.Name == "" {
 		return
 	}
 	// Adds the metadata association to the map
-	fm.funcDecl[newFuncMeta.name] = newFuncMeta
+	fm.FuncDecl[newFuncMeta.Name] = newFuncMeta
 }
 
 // In order for fileMetadata to be used in the ast.Walk() method, it must implement
@@ -58,7 +59,7 @@ func (fm fileMetadata) Visit(node ast.Node) ast.Visitor {
 		return nil
 	case *ast.FuncDecl:
 		newFunction := GetFunctionMetadata(stmt)
-		fmt.Printf("GteFunctionMetadata output: %+v \n", newFunction)
+		fm.AddFunctionMeta(newFunction)
 		return nil
 	// Error handling case
 	case *ast.BadDecl, *ast.BadExpr, *ast.BadStmt:
@@ -81,5 +82,9 @@ func ExtractPartialAutomata(file *ast.File) {
 	// With Walk() descends the AST in depth-first order
 	ast.Walk(metadata, file)
 
-	fmt.Printf("File metadata: %+v \n", metadata)
+	jsonMeta, err := json.MarshalIndent(metadata, "", "  ")
+	if err != nil {
+		log.Fatal("Erroro during JSON conversion")
+	}
+	fmt.Printf("File metadata: %+v \n", string(jsonMeta))
 }

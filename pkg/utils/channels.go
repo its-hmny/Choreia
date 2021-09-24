@@ -13,9 +13,9 @@ import (
 // typing - The type of the channel (int, string, ...)
 // async - The type of comunication is avaiable, async for buffered and sync for unbuffered
 type ChannelMetadata struct {
-	name   string
-	typing string
-	async  bool
+	Name   string
+	Typing string
+	Async  bool
 }
 
 // Is possible to declare a variable directly both with the
@@ -54,9 +54,9 @@ func GetSendTransaction(stmt *ast.SendStmt, currentState *int) (Transaction, err
 	if isIdent {
 		transaction := Transaction{Send, chanIdent.Name, Unknown, Unknown}
 		// Add state transaction to the automata fragment for the function
-		transaction.from = *currentState
+		transaction.From = *currentState
 		(*currentState)++
-		transaction.to = *currentState
+		transaction.To = *currentState
 		// At last returns the transaction
 		return transaction, nil
 	}
@@ -78,7 +78,7 @@ func GetRecvTransaction(stmt ast.Stmt, currentState *int) ([]Transaction, error)
 		for _, rValue := range typedStmt.Rhs {
 			transaction := parseRecvExpr(rValue, currentState)
 			// The expression isn't a recv from a channel
-			if transaction.identName == "" {
+			if transaction.IdentName == "" {
 				continue
 			}
 			// If the transaction is valid append it to the slice
@@ -87,7 +87,7 @@ func GetRecvTransaction(stmt ast.Stmt, currentState *int) ([]Transaction, error)
 	case *ast.ExprStmt:
 		transaction := parseRecvExpr(typedStmt.X, currentState)
 		// The expression isn't a recv from a channel
-		if transaction.identName == "" {
+		if transaction.IdentName == "" {
 			return []Transaction{}, nil
 		}
 		// If the transaction is valid append it to the slice
@@ -116,9 +116,9 @@ func parseRecvExpr(expr ast.Expr, currentState *int) Transaction {
 	// Creates a valid transaction struct
 	transaction := Transaction{Receive, chanIdent.Name, Unknown, Unknown}
 	// Add state transaction to the automata fragment for the function
-	transaction.from = *currentState
+	transaction.From = *currentState
 	(*currentState)++
-	transaction.to = *currentState
+	transaction.To = *currentState
 
 	return transaction
 }
