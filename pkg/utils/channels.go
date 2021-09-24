@@ -45,57 +45,82 @@ func GetChanMetadata(node ast.Node) []ChannelMetadata {
 	return nil
 }
 
-// TODO COMMENT
-//
-//
-func GetSendTransaction(stmt *ast.SendStmt) (Transaction, error) {
+// This function extrapolates a compliant transaction struct from a send statement
+// (obviously invoked on a channel). If at any point an error is encountered the func
+// bails out returning an error.
+// NOTE: the currentState pointer should not be nil
+func GetSendTransaction(stmt *ast.SendStmt, currentState *int) (Transaction, error) {
 	chanIdent, isIdent := stmt.Chan.(*ast.Ident)
 	if isIdent {
-		return Transaction{Send, chanIdent.Name, Unknown, Unknown}, nil
+		transaction := Transaction{Send, chanIdent.Name, Unknown, Unknown}
+		// Add state transaction to the automata fragment for the function
+		transaction.from = *currentState
+		(*currentState)++
+		transaction.to = *currentState
+		// At last returns the transaction
+		return transaction, nil
 	}
 	return Transaction{}, errors.New("GetSendTransaction: the channel isn't an identifier")
 }
 
-// TODO COMMENT
-//
-//
-func GetRecvTransaction(stmt ast.Stmt) ([]Transaction, error) {
+// This function extrapolates a compliant transaction struct from a recv statement.
+// At the moment there are only 2 type of stmt that could contain this send operation
+// inside it, both cases are handled in this function
+// If at any point an error is encountered the func bails out returning an error.
+// NOTE: the currentState pointer should not be nil
+func GetRecvTransaction(stmt ast.Stmt, currentState *int) ([]Transaction, error) {
+	// Buffer in whic all the extrapolated transaction are saved
 	parsed := []Transaction{}
+	// Based upon the possible expression tyoe extrapolates the data needed
 	switch typedStmt := stmt.(type) {
 	case *ast.AssignStmt:
+		// The assign statement allow for more expression inside it
 		for _, rValue := range typedStmt.Rhs {
-			transaction := parseSendExpr(rValue)
-			if transaction.from == transaction.to {
+			transaction := parseRecvExpr(rValue, currentState)
+			// The expression isn't a recv from a channel
+			if transaction.identName == "" {
 				continue
 			}
+			// If the transaction is valid append it to the slice
 			parsed = append(parsed, transaction)
 		}
 	case *ast.ExprStmt:
-		transaction := parseSendExpr(typedStmt.X)
-		if transaction.from == transaction.to {
+		transaction := parseRecvExpr(typedStmt.X, currentState)
+		// The expression isn't a recv from a channel
+		if transaction.identName == "" {
 			return []Transaction{}, nil
 		}
+		// If the transaction is valid append it to the slice
 		parsed = append(parsed, transaction)
 	}
 
+	// At last returns the list of transaction extrapolated
 	return parsed, nil
 }
 
-// TODO COMMENT
-//
-//
-func parseSendExpr(expr ast.Expr) Transaction {
+// This function takes a Expr interface and tries to extrapolate the transaction
+// data from the send operation (if existent) else return an invalid transaction
+// (with identName equal to "")
+func parseRecvExpr(expr ast.Expr, currentState *int) Transaction {
+	// Checks if the given its a unary expression
 	unaryExpr, isUnaryExpr := expr.(*ast.UnaryExpr)
 	if !isUnaryExpr || unaryExpr.Op != token.ARROW {
 		return Transaction{}
 	}
 
+	// Checks if the nested expression its an identifier (the channel name)
 	chanIdent, isIdent := unaryExpr.X.(*ast.Ident)
 	if !isIdent {
 		return Transaction{}
 	}
-	// TODO FIX THIS
-	return Transaction{Send, chanIdent.Name, Unknown, -2}
+	// Creates a valid transaction struct
+	transaction := Transaction{Receive, chanIdent.Name, Unknown, Unknown}
+	// Add state transaction to the automata fragment for the function
+	transaction.from = *currentState
+	(*currentState)++
+	transaction.to = *currentState
+
+	return transaction
 }
 
 // Specific function to extrapolate channel metadata from an AssignStmt

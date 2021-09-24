@@ -41,6 +41,7 @@ func main() {
 		fmt.Println("Hello from anonymous function")
 	}(3)
 
+	boundedChan <- "Hello"
 	<-boundedChan
 	x, y := <-channel, <-channel // Receive from c
 

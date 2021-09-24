@@ -2,7 +2,6 @@ package utils
 
 import (
 	"errors"
-	"fmt"
 	"go/ast"
 	"log"
 )
@@ -36,9 +35,9 @@ type Transaction struct {
 }
 
 type FunctionMetadata struct {
-	name        string
-	inlineArg   []ArgumentToExpand
-	transaction []Transaction
+	name         string
+	inlineArg    []ArgumentToExpand
+	transactions []Transaction
 }
 
 func GetFunctionMetadata(stmt *ast.FuncDecl) FunctionMetadata {
@@ -47,7 +46,6 @@ func GetFunctionMetadata(stmt *ast.FuncDecl) FunctionMetadata {
 	funcArgs := stmt.Type.Params.List
 	// Initial setup of the metadata record
 	metadata := FunctionMetadata{funcName, nil, nil}
-	fmt.Printf("DEBUG function name %s \n", funcName)
 
 	// The current is an external function
 	if stmt.Body == nil {
@@ -77,47 +75,20 @@ func GetFunctionMetadata(stmt *ast.FuncDecl) FunctionMetadata {
 		}
 	}
 
-	// The function has a return type (TODO is needed)
-	/*
-		if stmt.Type.Results != nil {
-			returnVals := stmt.Type.Results.List
-			fmt.Printf("  DEBUG return type %+v \n", returnVals[0])
-		}
-	*/
-
-	// Parse the body of the function in order to extrapolate transaction and function call
-	for _, command := range stmt.Body.List {
-		switch blockStmt := command.(type) {
-		// Go routine spawn statement
-		case *ast.GoStmt:
-			spawnTransaction, err := GetSpawnTransaction(blockStmt)
-			if err != nil {
-				log.Fatalf("%s\n", err)
-			}
-			fmt.Printf("  DEBUG go spawn %+v\n", spawnTransaction)
-		// Send to a channel statement
-		case *ast.SendStmt:
-			sendTransaction, err := GetSendTransaction(blockStmt)
-			if err != nil {
-				log.Fatalf("%s\n", err)
-			}
-			fmt.Printf("  DEBUG send channel %+v\n", sendTransaction)
-		// Possibily, receive from channel
-		case *ast.ExprStmt, *ast.AssignStmt:
-			sendTransactions, _ := GetRecvTransaction(blockStmt)
-			if len(sendTransactions) > 0 {
-				fmt.Printf("  DEBUG recv channel %+v\n", sendTransactions)
-			}
-
-		default:
-			fmt.Printf("  DEBUG command %T\n", blockStmt)
-		}
+	// Set the initial state of the fragment automata generated from the function
+	initialState := 0
+	transactionList, err := recursiveParseBlockStmt(stmt.Body, &initialState)
+	// Error checking
+	if err != nil {
+		log.Fatalf("%s\n", err)
 	}
+	// Set the list received in the metadata
+	metadata.transactions = transactionList
 
 	return metadata
 }
 
-func GetSpawnTransaction(stmt *ast.GoStmt) (Transaction, error) {
+func GetSpawnTransaction(stmt *ast.GoStmt, currentState *int) (Transaction, error) {
 	transaction := Transaction{Spawn, "", Unknown, Unknown}
 
 	// Finds out if the function has been defined globally or we're spawning an anonymous function
@@ -128,26 +99,19 @@ func GetSpawnTransaction(stmt *ast.GoStmt) (Transaction, error) {
 	if isFuncIdent {
 		// The avaiable function name is set but doesn't inherit scopes (and channels variables)
 		transaction.identName = funcIdent.Name
-
-		// Checks if some arguments are channels and eventually copies their metadata
-		// TODO
-		/*
-			for _, argExpr := range stmt.Call.Args {
-				localVarIdent, isIdentifier := argExpr.(*ast.Ident)
-
-				if !isIdentifier {
-					continue
-				}
-
-				fmt.Printf("\t Argument: type %T, value: %s\n", localVarIdent, localVarIdent.Name)
-			}
-		*/
+		// Add state transaction to the automata fragment for the function
+		transaction.from = *currentState
+		(*currentState)++
+		transaction.to = *currentState
 	}
 
 	if isFuncAnonymous {
 		// The function name is a fallback one, but inherits scopes from the parent/caller
 		transaction.identName = AnonymousFunc
-
+		// Add state transaction to the automata fragment for the function
+		transaction.from = *currentState
+		(*currentState)++
+		transaction.to = *currentState
 		// TODO Add parent avaiableChan
 		// TODO Add parse arguments (different from above)
 		// TODO Should parse body of funcLiteral (?)
@@ -159,4 +123,40 @@ func GetSpawnTransaction(stmt *ast.GoStmt) (Transaction, error) {
 	}
 
 	return transaction, nil
+}
+
+func recursiveParseBlockStmt(body *ast.BlockStmt, currentState *int) ([]Transaction, error) {
+	transactionList := []Transaction{}
+	// Arguments checking
+	if currentState == nil {
+		return []Transaction{}, errors.New("recursiveParseBlockStmt: passed nil value as currentState")
+	}
+
+	// Parse the body of the function in order to extrapolate transaction and function call
+	for _, command := range body.List {
+		switch blockStmt := command.(type) {
+		// Go routine spawn statement
+		case *ast.GoStmt:
+			spawnTransaction, err := GetSpawnTransaction(blockStmt, currentState)
+			if err != nil {
+				log.Fatalf("%s\n", err)
+			}
+			transactionList = append(transactionList, spawnTransaction)
+		// Send to a channel statement
+		case *ast.SendStmt:
+			sendTransaction, err := GetSendTransaction(blockStmt, currentState)
+			if err != nil {
+				log.Fatalf("%s\n", err)
+			}
+			transactionList = append(transactionList, sendTransaction)
+		// Possibily, receive from channel
+		case *ast.ExprStmt, *ast.AssignStmt:
+			recvTransactions, _ := GetRecvTransaction(blockStmt, currentState)
+			if len(recvTransactions) > 0 {
+				transactionList = append(transactionList, recvTransactions...)
+			}
+		}
+	}
+
+	return transactionList, nil
 }

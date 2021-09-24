@@ -28,6 +28,20 @@ func (fm *fileMetadata) AddChannels(newChannels []ChannelMetadata) {
 	}
 }
 
+// Adds the given metadata about a function to the fileMetadata struct
+// In case of a function with the same name then the previous association
+// is overwritten although this should not happen since it's not possible to
+// use the same function name more than one times (except for overloading that is ignored)
+// TODO CONSIDER OVERLOADED FUNCTION
+func (fm *fileMetadata) AddFunctionMeta(newFuncMeta FunctionMetadata) {
+	// Checks that the data is valid
+	if newFuncMeta.name == "" {
+		return
+	}
+	// Adds the metadata association to the map
+	fm.funcDecl[newFuncMeta.name] = newFuncMeta
+}
+
 // In order for fileMetadata to be used in the ast.Walk() method, it must implement
 // the Visitor interface and subsequently have a Visit() method with this signature
 func (fm fileMetadata) Visit(node ast.Node) ast.Visitor {
