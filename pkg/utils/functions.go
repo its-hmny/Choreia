@@ -125,8 +125,35 @@ func GetSpawnTransaction(stmt *ast.GoStmt, currentState *int) (Transaction, erro
 	return transaction, nil
 }
 
+// TODO COMMENT
 func GetCallTransaction(stmt ast.Stmt, currentState *int) ([]Transaction, error) {
-	return []Transaction{}, nil
+	// Buffer in whic all the extrapolated transaction are saved
+	parsed := []Transaction{}
+	// Based upon the possible expression tyoe extrapolates the data needed
+	switch typedStmt := stmt.(type) {
+	case *ast.AssignStmt:
+		// The assign statement allow for more expression inside it
+		for _, rValue := range typedStmt.Rhs {
+			transaction := parseCallExpr(rValue, currentState)
+			// The expression isn't a recv from a channel
+			if transaction.IdentName == "" {
+				continue
+			}
+			// If the transaction is valid append it to the slice
+			parsed = append(parsed, transaction)
+		}
+	case *ast.ExprStmt:
+		transaction := parseCallExpr(typedStmt.X, currentState)
+		// The expression isn't a recv from a channel
+		if transaction.IdentName == "" {
+			return []Transaction{}, nil
+		}
+		// If the transaction is valid append it to the slice
+		parsed = append(parsed, transaction)
+	}
+
+	// At last returns the list of transaction extrapolated
+	return parsed, nil
 }
 
 func recursiveParseBlockStmt(body *ast.BlockStmt, currentState *int) ([]Transaction, error) {
@@ -165,12 +192,34 @@ func recursiveParseBlockStmt(body *ast.BlockStmt, currentState *int) ([]Transact
 			}
 
 			if errCall != nil {
-				log.Fatalf("%s\n", errRecv)
-			} else if len(recvTransactions) > 0 {
+				log.Fatalf("%s\n", errCall)
+			} else if len(callTransactions) > 0 {
 				transactionList = append(transactionList, callTransactions...)
 			}
 		}
 	}
 
 	return transactionList, nil
+}
+
+func parseCallExpr(expr ast.Expr, currentState *int) Transaction {
+	// Checks if the given its a unary expression
+	callExpr, isCallExpr := expr.(*ast.CallExpr)
+	if !isCallExpr {
+		return Transaction{}
+	}
+
+	// Checks if the nested expression its an identifier (the channel name)
+	funcIdent, isIdent := callExpr.Fun.(*ast.Ident)
+	if !isIdent {
+		return Transaction{}
+	}
+	// Creates a valid transaction struct
+	transaction := Transaction{Call, funcIdent.Name, Unknown, Unknown}
+	// Add state transaction to the automata fragment for the function
+	transaction.From = *currentState
+	(*currentState)++
+	transaction.To = *currentState
+
+	return transaction
 }
