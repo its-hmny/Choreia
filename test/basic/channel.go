@@ -18,6 +18,11 @@ func test(callback func(int) int, channel chan int) int {
 	return (callback(<-channel))
 }
 
+func void() int {
+	// Does nothing
+	return 1
+}
+
 func sum(s []int, c chan int) int {
 	accumulator := 0
 	for _, v := range s {
@@ -41,11 +46,14 @@ func main() {
 		fmt.Println("Hello from anonymous function")
 	}(3)
 
+	void()
+	csc := void()
+
 	boundedChan <- "Hello"
 	<-boundedChan
 	x, y := <-channel, <-channel // Receive from c
 
 	close(channel)
 
-	fmt.Println(x, y, x+y)
+	fmt.Println(x, y, x+y, csc)
 }
