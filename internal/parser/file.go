@@ -29,7 +29,10 @@ type FileMetadata struct {
 func (fm *FileMetadata) addChannelMeta(channelsMeta ...ChannelMetadata) {
 	// Adds/updates the associations
 	for _, channel := range channelsMeta {
-		fm.GlobalChan[channel.Name] = channel
+		// Checks the validity of the current item
+		if channel.Name != "" && channel.Typing != "" {
+			fm.GlobalChan[channel.Name] = channel
+		}
 	}
 }
 
@@ -41,7 +44,10 @@ func (fm *FileMetadata) addChannelMeta(channelsMeta ...ChannelMetadata) {
 func (fm *FileMetadata) addFunctionMeta(functionMetas ...FunctionMetadata) {
 	// Adds the metadata association to the map
 	for _, function := range functionMetas {
-		fm.FuncDecl[function.Name] = function
+		// Checks the validity of the current item
+		if function.Name != "" {
+			fm.FuncDecl[function.Name] = function
+		}
 	}
 }
 
@@ -61,7 +67,7 @@ func (fm FileMetadata) Visit(node ast.Node) ast.Visitor {
 		return nil
 	// Obvoiusly we want to extrapolate data about the declared function (and their action)
 	case *ast.FuncDecl:
-		newFunction := GetFunctionMetadata(stmt)
+		newFunction := NewFunctionMetadata(stmt)
 		fm.addFunctionMeta(newFunction)
 		return nil
 	// Error handling case

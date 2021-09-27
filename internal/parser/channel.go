@@ -76,7 +76,7 @@ func GetSendTransaction(stmt *ast.SendStmt, currentState *int) (Transaction, err
 // inside it, both cases are handled in this function
 // If at any point an error is encountered the func bails out returning an error.
 // NOTE: the currentState pointer should not be nil
-func GetRecvTransaction(stmt ast.Stmt, currentState *int) ([]Transaction, error) {
+func GetRecvTransaction(stmt ast.Node, currentState *int) ([]Transaction, error) {
 	// Buffer in whic all the extrapolated transaction are saved
 	parsed := []Transaction{}
 	// Based upon the possible expression tyoe extrapolates the data needed
