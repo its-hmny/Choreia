@@ -35,8 +35,9 @@ func sum(s []int, c chan int) int {
 
 func main() {
 	s := []int{7, 2, 8, -9, 4, 0}
+	list := make([]int, 2)
 
-	channel := make(chan int)
+	var channel = make(chan int)
 	boundedChan := make(chan string, 10)
 
 	go sum(s, channel)
