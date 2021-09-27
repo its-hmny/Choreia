@@ -49,6 +49,14 @@ func ExtractChanMetadata(node ast.Node) []ChannelMetadata {
 			return nil
 		}
 		return newChannels
+	// Type: var chan = make(...) but in global scope is not wrapped by a DeclStmt
+	case *ast.GenDecl:
+		newChannels, err := parseGenDecl(statement)
+		if err != nil {
+			log.Fatal(err)
+			return nil
+		}
+		return newChannels
 	}
 	return nil
 }
@@ -161,8 +169,6 @@ func parseAssignStmt(stmt *ast.AssignStmt) ([]ChannelMetadata, error) {
 
 // Specific function to extrapolate channel metadata from a GenDecl statement
 func parseDeclStmt(stmt *ast.DeclStmt) ([]ChannelMetadata, error) {
-	// A Slice containing all the metadata retrieved about the channel declared
-	metadata := []ChannelMetadata{}
 	// Tries to cast the current statement's declaration to a GenDecl. At the moment
 	// of writing this should always be possible since only GenDecl satisfy the Decl interface
 	// however this may change in future releases og Go
@@ -171,6 +177,13 @@ func parseDeclStmt(stmt *ast.DeclStmt) ([]ChannelMetadata, error) {
 	if !isGenDecl {
 		return nil, errors.New("the declaration in the statement isn't a GenDecl")
 	}
+
+	return parseGenDecl(genDecl)
+}
+
+func parseGenDecl(genDecl *ast.GenDecl) ([]ChannelMetadata, error) {
+	// A Slice containing all the metadata retrieved about the channel declared
+	metadata := []ChannelMetadata{}
 
 	for _, specVal := range genDecl.Specs {
 		// When the token is VAR or CONST then Specs is a ValueSpec
@@ -208,7 +221,9 @@ func extractMetadata(chanName string, rVal ast.Expr) (ChannelMetadata, error) {
 	// we just want to consider Rhs expression that are function call
 	callExpr, isCallExpr := rVal.(*ast.CallExpr)
 	// If the Rhs expression isn't a function call we skip the current iteration
-	if !isCallExpr {
+	// we skip as well if the function called has no arguments since we're only
+	// interested in this case in "make" call that always has at least one param
+	if !isCallExpr || len(callExpr.Args) <= 0 {
 		return ChannelMetadata{}, errors.New("cannot parse, not a func")
 	}
 

@@ -44,11 +44,20 @@ type Transaction struct {
 }
 
 type FunctionMetadata struct {
-	Name         string
-	ScopeChannel []ChannelMetadata
-	InlineArg    []ArgumentToExpand
-	currentState *int
-	Transactions map[string]Transaction
+	Name          string
+	ScopeChannels map[string]ChannelMetadata
+	InlineArgs    []ArgumentToExpand
+	currentState  *int
+	Transactions  map[string]Transaction
+}
+
+func (fm *FunctionMetadata) addChannels(newChannels ...ChannelMetadata) {
+	for _, channel := range newChannels {
+		// Checks the validity of the current item
+		if channel.Name != "" && channel.Typing != "" {
+			fm.ScopeChannels[channel.Name] = channel
+		}
+	}
 }
 
 func (fm *FunctionMetadata) addTransactions(newTransactions ...Transaction) {
@@ -86,9 +95,10 @@ func (fm FunctionMetadata) Visit(node ast.Node) ast.Visitor {
 		fm.addTransactions(sendTransaction)
 		return nil
 	// Possibily, receive from channel
-	case *ast.ExprStmt, *ast.AssignStmt:
+	case *ast.ExprStmt, *ast.AssignStmt, *ast.DeclStmt:
 		recvTransactions, errRecv := GetRecvTransaction(statement, fm.currentState)
 		callTransactions, errCall := getCallTransaction(statement, fm.currentState)
+		channelsMeta := ExtractChanMetadata(statement)
 
 		if errRecv != nil {
 			log.Fatal(errRecv)
@@ -102,6 +112,10 @@ func (fm FunctionMetadata) Visit(node ast.Node) ast.Visitor {
 			fm.addTransactions(callTransactions...)
 		}
 
+		if len(channelsMeta) > 0 {
+			fm.addChannels(channelsMeta...)
+		}
+
 		return nil
 	}
 	return fm
@@ -113,7 +127,13 @@ func NewFunctionMetadata(stmt *ast.FuncDecl) FunctionMetadata {
 	funcArgs := stmt.Type.Params.List
 	// Initial setup of the metadata record
 	initialState := 0
-	metadata := FunctionMetadata{funcName, nil, nil, &initialState, make(map[string]Transaction)}
+	metadata := FunctionMetadata{
+		funcName,
+		make(map[string]ChannelMetadata),
+		nil,
+		&initialState,
+		make(map[string]Transaction),
+	}
 
 	// The current is an external (non Go) function, not useful for us
 	if stmt.Body == nil {
@@ -132,13 +152,13 @@ func NewFunctionMetadata(stmt *ast.FuncDecl) FunctionMetadata {
 			// We're interested only in function and channel passed as arguments
 			if isChannel {
 				newInlineArg := ArgumentToExpand{i, argName, Channel}
-				metadata.InlineArg = append(metadata.InlineArg, newInlineArg)
+				metadata.InlineArgs = append(metadata.InlineArgs, newInlineArg)
 			}
 
 			// We're interested only in function and channel passed as arguments
 			if isFunction {
 				newInlineArg := ArgumentToExpand{i, argName, Function}
-				metadata.InlineArg = append(metadata.InlineArg, newInlineArg)
+				metadata.InlineArgs = append(metadata.InlineArgs, newInlineArg)
 			}
 		}
 	}
