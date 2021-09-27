@@ -26,12 +26,9 @@ type FileMetadata struct {
 // In case a channel with the same name already exist then the previous association
 // is overwritten, this is correct since the channel name is the variable to which
 // the channel is assigned and this means that a new assignment was made to that variable
-func (fm *FileMetadata) addChannels(newChannels []ChannelMetadata) {
-	if len(newChannels) <= 0 {
-		return
-	}
+func (fm *FileMetadata) addChannelMeta(channelsMeta ...ChannelMetadata) {
 	// Adds/updates the associations
-	for _, channel := range newChannels {
+	for _, channel := range channelsMeta {
 		fm.GlobalChan[channel.Name] = channel
 	}
 }
@@ -41,13 +38,11 @@ func (fm *FileMetadata) addChannels(newChannels []ChannelMetadata) {
 // is overwritten although this should not happen since it's not possible to
 // use the same function name more than one times (except for overloading that is ignored)
 // TODO CONSIDER OVERLOADED FUNCTION
-func (fm *FileMetadata) addFunctionMeta(funcMeta FunctionMetadata) {
-	// Checks that the data is valid
-	if funcMeta.Name == "" {
-		return
-	}
+func (fm *FileMetadata) addFunctionMeta(functionMetas ...FunctionMetadata) {
 	// Adds the metadata association to the map
-	fm.FuncDecl[funcMeta.Name] = funcMeta
+	for _, function := range functionMetas {
+		fm.FuncDecl[function.Name] = function
+	}
 }
 
 // In order for fileMetadata to be used in the ast.Walk() method, it must implement
@@ -62,7 +57,7 @@ func (fm FileMetadata) Visit(node ast.Node) ast.Visitor {
 	// In this case we're interested in extrapolating info about global channel declaration
 	case *ast.AssignStmt, *ast.DeclStmt:
 		newChannels := ExtractChanMetadata(stmt)
-		fm.addChannels(newChannels)
+		fm.addChannelMeta(newChannels...)
 		return nil
 	// Obvoiusly we want to extrapolate data about the declared function (and their action)
 	case *ast.FuncDecl:
@@ -78,7 +73,9 @@ func (fm FileMetadata) Visit(node ast.Node) ast.Visitor {
 	return fm
 }
 
-// TODO COMMENT
+// This function handles the extraction of metadata about the given file, it simply
+// receives an *ast.File as input and call ast.Walk on it. Whenever it encounters something
+// interesting such as global channel or function declaration it saves the metadata avaiable
 func ExtractFileMetadata(file *ast.File) FileMetadata {
 	// Intializes the file metadata struct in which all the data
 	// avaiable and useful will be stored
