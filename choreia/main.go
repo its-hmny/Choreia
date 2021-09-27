@@ -48,7 +48,7 @@ func main() {
 	f, err := parser.ParseFile(fset, "example/_channel.go", nil, flags)
 
 	if err != nil {
-		log.Fatalf("ParseFile error: %s\n", err)
+		log.Fatal(err)
 		return
 	}
 

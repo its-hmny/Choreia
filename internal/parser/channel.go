@@ -29,7 +29,7 @@ type ChannelMetadata struct {
 // Is possible to declare a variable directly both with the
 // := notation (AssignStmt) or with a more verbose syntax
 // var chan = make(...) (GenDecl) this method handles both
-func GetChanMetadata(node ast.Node) []ChannelMetadata {
+func ExtractChanMetadata(node ast.Node) []ChannelMetadata {
 	// Determines the type of the given expression
 	switch statement := node.(type) {
 	// Type: chan := make(...)
@@ -68,7 +68,7 @@ func GetSendTransaction(stmt *ast.SendStmt, currentState *int) (Transaction, err
 		// At last returns the transaction
 		return transaction, nil
 	}
-	return Transaction{}, errors.New("GetSendTransaction: the channel isn't an identifier")
+	return Transaction{}, errors.New("the channel isn't an identifier")
 }
 
 // This function extrapolates a compliant transaction struct from a recv statement.
@@ -139,7 +139,7 @@ func parseAssignStmt(stmt *ast.AssignStmt) ([]ChannelMetadata, error) {
 	// Check that the number of rvalues (variable assigned) are the same of
 	// lvalues (values assignments) in the statement (TODO TEST)
 	if len(stmt.Lhs) != len(stmt.Rhs) {
-		err := errors.New("parseAssignmentStmt: should receive same number of l_val and r_val")
+		err := errors.New("should receive same number of l_val and r_val")
 		return nil, err
 	}
 

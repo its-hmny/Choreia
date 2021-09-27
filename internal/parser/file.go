@@ -60,8 +60,8 @@ func (fm FileMetadata) Visit(node ast.Node) ast.Visitor {
 
 	switch stmt := node.(type) {
 	// In this case we're interested in extrapolating info about global channel declaration
-	case *ast.AssignStmt, *ast.GenDecl:
-		newChannels := GetChanMetadata(stmt)
+	case *ast.AssignStmt, *ast.DeclStmt:
+		newChannels := ExtractChanMetadata(stmt)
 		fm.addChannels(newChannels)
 		return nil
 	// Obvoiusly we want to extrapolate data about the declared function (and their action)

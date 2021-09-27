@@ -88,7 +88,7 @@ func GetFunctionMetadata(stmt *ast.FuncDecl) FunctionMetadata {
 	transactionList, err := recursiveParseBlockStmt(stmt.Body, &initialState)
 	// Error checking
 	if err != nil {
-		log.Fatalf("%s\n", err)
+		log.Fatal(err)
 	}
 	// Set the list received in the metadata
 	metadata.Transactions = transactionList
@@ -126,7 +126,7 @@ func getSpawnTransaction(stmt *ast.GoStmt, currentState *int) (Transaction, erro
 	}
 
 	if !isFuncIdent && !isFuncAnonymous {
-		err := errors.New("GetGoRoutineMetadata: func isn't neither anonymous neither locally defined")
+		err := errors.New("func isn't neither anonymous neither locally defined")
 		return Transaction{}, err
 	}
 
@@ -168,7 +168,7 @@ func recursiveParseBlockStmt(body *ast.BlockStmt, currentState *int) ([]Transact
 	transactionList := []Transaction{}
 	// Arguments checking
 	if currentState == nil {
-		return []Transaction{}, errors.New("recursiveParseBlockStmt: passed nil value as currentState")
+		return []Transaction{}, errors.New("passed nil value as currentState")
 	}
 
 	// Parse the body of the function in order to extrapolate transaction and function call
@@ -178,14 +178,14 @@ func recursiveParseBlockStmt(body *ast.BlockStmt, currentState *int) ([]Transact
 		case *ast.GoStmt:
 			spawnTransaction, err := getSpawnTransaction(blockStmt, currentState)
 			if err != nil {
-				log.Fatalf("%s\n", err)
+				log.Fatal(err)
 			}
 			transactionList = append(transactionList, spawnTransaction)
 		// Send to a channel statement
 		case *ast.SendStmt:
 			sendTransaction, err := GetSendTransaction(blockStmt, currentState)
 			if err != nil {
-				log.Fatalf("%s\n", err)
+				log.Fatal(err)
 			}
 			transactionList = append(transactionList, sendTransaction)
 		// Possibily, receive from channel
@@ -194,13 +194,13 @@ func recursiveParseBlockStmt(body *ast.BlockStmt, currentState *int) ([]Transact
 			callTransactions, errCall := getCallTransaction(blockStmt, currentState)
 
 			if errRecv != nil {
-				log.Fatalf("%s\n", errRecv)
+				log.Fatal(errRecv)
 			} else if len(recvTransactions) > 0 {
 				transactionList = append(transactionList, recvTransactions...)
 			}
 
 			if errCall != nil {
-				log.Fatalf("%s\n", errCall)
+				log.Fatal(errCall)
 			} else if len(callTransactions) > 0 {
 				transactionList = append(transactionList, callTransactions...)
 			}
