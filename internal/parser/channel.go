@@ -1,4 +1,12 @@
-package utils
+// Copyright Enea Guidi (hmny).
+
+// This package handles the parsing of a given *ast.File which represents
+// the content of a Go source file as an Abstract Syntax Tree.
+
+// The only methods avaiable from the outside are ExtractChanMetadata,
+// GetSendTransaction and GetRecvTransaction, they return respectively the
+// ChannelMetadata struct and a Transaction struct for the latter.
+package parser
 
 import (
 	"errors"
@@ -34,8 +42,8 @@ func GetChanMetadata(node ast.Node) []ChannelMetadata {
 		return newChannels
 
 	// Type: var chan = make(...)
-	case *ast.GenDecl:
-		newChannels, err := parseGenDecl(statement)
+	case *ast.DeclStmt:
+		newChannels, err := parseDeclStmt(statement)
 		if err != nil {
 			log.Fatal(err)
 			return nil
@@ -114,7 +122,7 @@ func parseRecvExpr(expr ast.Expr, currentState *int) Transaction {
 		return Transaction{}
 	}
 	// Creates a valid transaction struct
-	transaction := Transaction{Receive, chanIdent.Name, Unknown, Unknown}
+	transaction := Transaction{Recv, chanIdent.Name, Unknown, Unknown}
 	// Add state transaction to the automata fragment for the function
 	transaction.From = *currentState
 	(*currentState)++
@@ -152,18 +160,26 @@ func parseAssignStmt(stmt *ast.AssignStmt) ([]ChannelMetadata, error) {
 }
 
 // Specific function to extrapolate channel metadata from a GenDecl statement
-func parseGenDecl(stmt *ast.GenDecl) ([]ChannelMetadata, error) {
+func parseDeclStmt(stmt *ast.DeclStmt) ([]ChannelMetadata, error) {
 	// A Slice containing all the metadata retrieved about the channel declared
 	metadata := []ChannelMetadata{}
+	// Tries to cast the current statement's declaration to a GenDecl. At the moment
+	// of writing this should always be possible since only GenDecl satisfy the Decl interface
+	// however this may change in future releases og Go
+	genDecl, isGenDecl := stmt.Decl.(*ast.GenDecl)
 
-	for _, specVal := range stmt.Specs {
+	if !isGenDecl {
+		return nil, errors.New("the declaration in the statement isn't a GenDecl")
+	}
+
+	for _, specVal := range genDecl.Specs {
 		// When the token is VAR or CONST then Specs is a ValueSpec
 		valueSpec, isValueSpec := specVal.(*ast.ValueSpec)
-		if (stmt.Tok == token.CONST || stmt.Tok == token.VAR) && isValueSpec {
+		if (genDecl.Tok == token.CONST || genDecl.Tok == token.VAR) && isValueSpec {
 			// Check that the number of rvalues (variable assigned) are the same of
 			// lvalues (values assignments) in the statement (TODO TEST)
 			if len(valueSpec.Values) != len(valueSpec.Names) {
-				err := errors.New("parseGenDecl: should receive same number of l_val and r_val")
+				err := errors.New("should receive same number of l_val and r_val")
 				return nil, err
 			}
 

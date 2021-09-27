@@ -1,4 +1,10 @@
-package utils
+// Copyright Enea Guidi (hmny).
+
+// This package handles the parsing of a given *ast.File which represents
+// the content of a Go source file as an Abstract Syntax Tree.
+
+// TODO COMMENT
+package parser
 
 import (
 	"errors"
@@ -8,16 +14,18 @@ import (
 
 const (
 	// Transaction type enum
-	Spawn   = "Spawn"
-	Send    = "Send"
-	Receive = "Recv"
-	Call    = "Call"
+	Spawn = "Spawn"
+	Send  = "Send"
+	Recv  = "Recv"
+	Call  = "Call"
 
 	// ArgToExpand type enum
 	Function = 0
 	Channel  = 1
 
-	Unknown       = -1
+	// Transaction error values for "from" and "to" fields
+	Unknown = -1
+	// Constant to identify anonymous function
 	AnonymousFunc = "anonymousFunc"
 )
 
@@ -88,7 +96,7 @@ func GetFunctionMetadata(stmt *ast.FuncDecl) FunctionMetadata {
 	return metadata
 }
 
-func GetSpawnTransaction(stmt *ast.GoStmt, currentState *int) (Transaction, error) {
+func getSpawnTransaction(stmt *ast.GoStmt, currentState *int) (Transaction, error) {
 	transaction := Transaction{Spawn, "", Unknown, Unknown}
 
 	// Finds out if the function has been defined globally or we're spawning an anonymous function
@@ -126,7 +134,7 @@ func GetSpawnTransaction(stmt *ast.GoStmt, currentState *int) (Transaction, erro
 }
 
 // TODO COMMENT
-func GetCallTransaction(stmt ast.Stmt, currentState *int) ([]Transaction, error) {
+func getCallTransaction(stmt ast.Stmt, currentState *int) ([]Transaction, error) {
 	// Buffer in whic all the extrapolated transaction are saved
 	parsed := []Transaction{}
 	// Based upon the possible expression tyoe extrapolates the data needed
@@ -168,7 +176,7 @@ func recursiveParseBlockStmt(body *ast.BlockStmt, currentState *int) ([]Transact
 		switch blockStmt := command.(type) {
 		// Go routine spawn statement
 		case *ast.GoStmt:
-			spawnTransaction, err := GetSpawnTransaction(blockStmt, currentState)
+			spawnTransaction, err := getSpawnTransaction(blockStmt, currentState)
 			if err != nil {
 				log.Fatalf("%s\n", err)
 			}
@@ -183,7 +191,7 @@ func recursiveParseBlockStmt(body *ast.BlockStmt, currentState *int) ([]Transact
 		// Possibily, receive from channel
 		case *ast.ExprStmt, *ast.AssignStmt:
 			recvTransactions, errRecv := GetRecvTransaction(blockStmt, currentState)
-			callTransactions, errCall := GetCallTransaction(blockStmt, currentState)
+			callTransactions, errCall := getCallTransaction(blockStmt, currentState)
 
 			if errRecv != nil {
 				log.Fatalf("%s\n", errRecv)
