@@ -47,8 +47,16 @@ func main() {
 		fmt.Println("Hello from anonymous function")
 	}(3)
 
-	void()
-	csc := void()
+	if true {
+		void()
+		csc := void()
+	} else if false {
+		void()
+		csc := void()
+	} else {
+		void()
+		csc := void()
+	}
 
 	boundedChan <- "Hello"
 	<-boundedChan

@@ -15,6 +15,7 @@ import (
 
 const (
 	// Transaction type enum
+	Eps   = "Epsilon"
 	Spawn = "Spawn"
 	Send  = "Send"
 	Recv  = "Recv"
@@ -30,26 +31,28 @@ const (
 	AnonymousFunc = "anonymousFunc"
 )
 
-type ArgumentToExpand struct {
-	ArgIndex int
-	ArgName  string
-	ArgType  uint
-}
+type (
+	ArgumentToExpand struct {
+		ArgIndex int
+		ArgName  string
+		ArgType  uint
+	}
 
-type Transaction struct {
-	Category  string
-	IdentName string
-	From      int
-	To        int
-}
+	Transaction struct {
+		Category  string
+		IdentName string
+		From      int
+		To        int
+	}
 
-type FunctionMetadata struct {
-	Name          string
-	ScopeChannels map[string]ChannelMetadata
-	InlineArgs    []ArgumentToExpand
-	currentState  *int
-	Transactions  map[string]Transaction
-}
+	FunctionMetadata struct {
+		Name          string
+		ScopeChannels map[string]ChannelMetadata
+		InlineArgs    []ArgumentToExpand
+		currentState  *int
+		Transactions  map[string]Transaction
+	}
+)
 
 func (fm *FunctionMetadata) addChannels(newChannels ...ChannelMetadata) {
 	for _, channel := range newChannels {
@@ -78,6 +81,12 @@ func (fm FunctionMetadata) Visit(node ast.Node) ast.Visitor {
 	}
 
 	switch statement := node.(type) {
+	// Generic handler for nested scopes, the single cases are handled inside the function
+	case *ast.IfStmt, *ast.SwitchStmt, *ast.TypeSwitchStmt:
+		GetBranchStmtMetadata(&fm, node)
+	// ! Add it back once implemented
+	// case *ast.ForStmt, *ast.RangeStmt, *ast.SelectStmt:
+	// GetIterationMetadata(&fm, node)
 	// Go routine spawn statement
 	case *ast.GoStmt:
 		spawnTransaction, err := getSpawnTransaction(statement, fm.currentState)
@@ -166,18 +175,9 @@ func NewFunctionMetadata(stmt *ast.FuncDecl) FunctionMetadata {
 	ast.Walk(metadata, stmt.Body)
 
 	// TODO REMOVE
-	for _, t := range metadata.Transactions {
-		fmt.Printf("%+v \n", t)
-	}
-	// Set the initial state of the fragment automata generated from the function
-	// initialState := 0
-	// transactionList, err := recursiveParseBlockStmt(stmt.Body, &initialState)
-	// Error checking
-	// if err != nil {
-	// log.Fatal(err)
+	// for _, t := range metadata.Transactions {
+	// fmt.Printf("%+v \n", t)
 	// }
-	// Set the list received in the metadata
-	// metadata.Transactions = transactionList
 
 	return metadata
 }
