@@ -15,6 +15,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/pborman/getopt/v2"
+
 	choreia_parser "github.com/its-hmny/Choreia/internal/parser"
 )
 
@@ -35,17 +37,38 @@ func main() {
 	log.SetPrefix("[Choreia]: ")
 	log.SetFlags(0)
 
-	// Command line argument checking
-	//if len(os.Args) < 2 {
-	//	log.Fatal("A path to an existing go source file is neeeded")
-	//}
+	// Getopt setup for CLI argument parsing
+	inputFile := getopt.StringLong("input", 'i', "", "The .go file from which extract the Choreography Automata")
+	traceFlags := getopt.BoolLong("trace", 't', "Pretty prints on the console the AST", "false")
+	getopt.BoolLong("help", 'h', "Display this help message", "false")
+	// ! Only for debugging pourposes will be removed later
+	debugFlags := getopt.BoolLong("debug", 'd', "Pretty prints on the console the AST", "false")
+
+	// Parse the program arguments
+	getopt.Parse()
+
+	// Checks for the existence of an input file
+	if inputFile == nil && *inputFile == "" {
+		getopt.Usage()
+		return
+	}
+	// Checks that the given input path actually exists
+	if fStat, err := os.Stat(*inputFile); os.IsNotExist(err) || fStat.IsDir() {
+		log.Fatal("A path to an existing go source file is neeeded")
+	}
 
 	// Positions are relative to fset
 	fset := token.NewFileSet()
-	// Parser mode flags, we want all every error possible and a trace printed on the stdout
+
+	// Parser mode flags, we want all every error possible
 	flags := parser.DeclarationErrors | parser.AllErrors
+	// And optionally a trace printed on the stdout
+	if traceFlags != nil && *traceFlags {
+		flags |= parser.Trace
+	}
+
 	// Parse the file identified by the given path and print the tree to the terminal.
-	f, err := parser.ParseFile(fset, "example/_channel.go", nil, flags)
+	f, err := parser.ParseFile(fset, *inputFile, nil, flags)
 
 	if err != nil {
 		log.Fatal(err)
@@ -53,9 +76,11 @@ func main() {
 	}
 
 	// ! Debug Visitor to print to terminal in a more human readable manner the AST
-	var debug debugVisitor
-	ast.Walk(debug, f)
-	fmt.Printf("\n\nGLOBAL SCOPE PARSER DEBUG PRINT \n")
+	if debugFlags != nil && *debugFlags {
+		var debug debugVisitor
+		ast.Walk(debug, f)
+		fmt.Printf("\n\nGLOBAL SCOPE PARSER DEBUG PRINT \n")
+	}
 
 	// Extracts the metadata about the given Go file and writes it to a JSON metadata file
 	fileMetadata := choreia_parser.ExtractFileMetadata(f)
