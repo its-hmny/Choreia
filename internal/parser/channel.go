@@ -61,6 +61,41 @@ func ExtractChanMetadata(node ast.Node) []ChannelMetadata {
 	return nil
 }
 
+// TODO COMMENT This function extrapolates a compliant transaction struct from a send statement
+// (obviously invoked on a channel). If at any point an error is encountered the func
+// bails out returning an error.
+// NOTE: the currentState pointer should not be nil
+func GetSelectTransaction(stmt *ast.SelectStmt, currentState *int) []Transaction {
+	// Accumulator buffer for the (to be extracted) transaction
+	caseTransactions := []Transaction{}
+
+	for _, bodyStmt := range stmt.Body.List {
+		// Local copy from which fork the path of each case statement
+		localCopyState := *currentState
+		commClause := bodyStmt.(*ast.CommClause)
+
+		// The current is the default case of the select statement
+		if commClause.Comm == nil {
+			continue
+		}
+
+		// Else we're evaluating a Send or a Receive from a channel
+		switch commStmt := commClause.Comm.(type) {
+		case *ast.SendStmt:
+			// ! The transaction aren't inserted corretcly (change when possible)
+			newTransaction, _ := GetSendTransaction(commStmt, &localCopyState)
+			caseTransactions = append(caseTransactions, newTransaction)
+		case *ast.AssignStmt, *ast.ExprStmt: // Receive from a channel
+			// ! The transaction aren't inserted corretcly (change when possible)
+			newTransactions, _ := GetRecvTransaction(commStmt, &localCopyState)
+			caseTransactions = append(caseTransactions, newTransactions...)
+		}
+	}
+
+	// Return the extrapolated transaction
+	return caseTransactions
+}
+
 // This function extrapolates a compliant transaction struct from a send statement
 // (obviously invoked on a channel). If at any point an error is encountered the func
 // bails out returning an error.

@@ -81,12 +81,12 @@ func (fm FunctionMetadata) Visit(node ast.Node) ast.Visitor {
 	}
 
 	switch statement := node.(type) {
-	// Generic handler for nested scopes, the single cases are handled inside the function
-	case *ast.IfStmt, *ast.SwitchStmt, *ast.TypeSwitchStmt:
-		GetBranchStmtMetadata(&fm, node)
-	// ! Add it back once implemented
-	// case *ast.ForStmt, *ast.RangeStmt, *ast.SelectStmt:
-	// GetIterationMetadata(&fm, node)
+	// ! Add it back once implemented (priority given to the builtin concurrency construct)
+	// Generic handler for nested scopes, the single cases arez handled inside the function
+	// case *ast.IfStmt, *ast.SwitchStmt, *ast.TypeSwitchStmt:
+	// GetBranchStmtMetadata(&fm, node)
+	case *ast.ForStmt, *ast.RangeStmt:
+		GetIterationStmtMetadata(&fm, node)
 	// Go routine spawn statement
 	case *ast.GoStmt:
 		spawnTransaction, err := getSpawnTransaction(statement, fm.currentState)
@@ -94,6 +94,10 @@ func (fm FunctionMetadata) Visit(node ast.Node) ast.Visitor {
 			log.Fatal(err)
 		}
 		fm.addTransactions(spawnTransaction)
+		return nil
+	case *ast.SelectStmt:
+		selectTransaction := GetSelectTransaction(statement, fm.currentState)
+		fm.addTransactions(selectTransaction...)
 		return nil
 	// Send to a channel statement
 	case *ast.SendStmt:
