@@ -67,9 +67,8 @@ func main() {
 		flags |= parser.Trace
 	}
 
-	// Parse the file identified by the given path and print the tree to the terminal.
+	// Parses the file and retrieves the AST
 	f, err := parser.ParseFile(fset, *inputFile, nil, flags)
-
 	if err != nil {
 		log.Fatal(err)
 		return
