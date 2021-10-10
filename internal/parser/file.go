@@ -26,9 +26,9 @@ type FileMetadata struct {
 // In case a channel with the same name already exist then the previous association
 // is overwritten, this is correct since the channel name is the variable to which
 // the channel is assigned and this means that a new assignment was made to that variable
-func (fm *FileMetadata) addChannelMeta(channelsMeta ...ChannelMetadata) {
+func (fm *FileMetadata) addChannelMeta(channelMetas ...ChannelMetadata) {
 	// Adds/updates the associations
-	for _, channel := range channelsMeta {
+	for _, channel := range channelMetas {
 		// Checks the validity of the current item
 		if channel.Name != "" && channel.Typing != "" {
 			fm.GlobalChan[channel.Name] = channel
@@ -40,7 +40,6 @@ func (fm *FileMetadata) addChannelMeta(channelsMeta ...ChannelMetadata) {
 // In case of a function with the same name then the previous association
 // is overwritten although this should not happen since it's not possible to
 // use the same function name more than one times (except for overloading that is ignored)
-// TODO CONSIDER OVERLOADED FUNCTION
 func (fm *FileMetadata) addFunctionMeta(functionMetas ...FunctionMetadata) {
 	// Adds the metadata association to the map
 	for _, function := range functionMetas {
