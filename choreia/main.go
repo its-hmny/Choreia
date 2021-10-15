@@ -78,11 +78,11 @@ func main() {
 	if debugFlags != nil && *debugFlags {
 		var debug debugVisitor
 		ast.Walk(debug, f)
-		fmt.Printf("\n\nGLOBAL SCOPE PARSER DEBUG PRINT \n")
+		fmt.Printf("\n------------------------ START DEBUG PRINT------------------------")
 	}
 
 	// Extracts the metadata about the given Go file and writes it to a JSON metadata file
-	fileMetadata := choreia_parser.ExtractFileMetadata(f)
+	fileMetadata := choreia_parser.ParseFile(f)
 	fileDump, fileErr := os.Create("file_meta.json")
 	jsonDump, jsonErr := json.MarshalIndent(fileMetadata, "", "  ")
 

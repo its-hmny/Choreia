@@ -3,274 +3,193 @@
 // This package handles the parsing of a given *ast.File which represents
 // the content of a Go source file as an Abstract Syntax Tree.
 
-// TODO COMMENT
+// The only method avaiable from the outside is ParseFuncDecl, ParseGoStmt and ParseCallExpr which
+// will add to the given FileMetadata argument the data collected from the parsing phases
 package parser
 
 import (
-	"errors"
 	"fmt"
 	"go/ast"
-	"log"
 )
 
 const (
-	// Transaction type enum
-	Eps   = "Epsilon"
-	Spawn = "Spawn"
-	Send  = "Send"
-	Recv  = "Recv"
-	Call  = "Call"
+	AnonymousFunc = "anonymousFunc" // Constant to identify anonymous function
 
-	// ArgToExpand type enum
-	Function = 0
-	Channel  = 1
-
-	// Transaction error values for "from" and "to" fields
-	Unknown = -1
-	// Constant to identify anonymous function
-	AnonymousFunc = "anonymousFunc"
+	Function = iota // Possible value of FuncArg.type
+	Channel
 )
 
-type (
-	ArgumentToExpand struct {
-		ArgIndex int
-		ArgName  string
-		ArgType  uint
-	}
+// ----------------------------------------------------------------------------
+// FuncMetadata
 
-	Transaction struct {
-		Category  string
-		IdentName string
-		From      int
-		To        int
-	}
+// A FuncMetadata contains the metadata avaiable about a Go function
+//
+// A struct containing all the metadata that the algorithm has been able to
+// extrapolate from the function declaration. Only the function declared in the file
+// by the user are evaluated (built-in and external functions are ignored)
+type FuncMetadata struct {
+	Name            string                  // The identifier of the function
+	ChanMeta        map[string]ChanMetadata // The channels avaiable inside the function scope
+	InlineArgs      map[string]FuncArg      // The argument of the function to be inlined (Callbacks/Functions or Channels)
+	PartialAutomata *TransitionGraph        // A graph representing the transition made inside the function body
+}
 
-	FunctionMetadata struct {
-		Name          string
-		ScopeChannels map[string]ChannelMetadata
-		InlineArgs    []ArgumentToExpand
-		currentState  *int
-		Transactions  map[string]Transaction
-	}
-)
+type FuncArg struct {
+	Offset int    // The position of the arg in the function declaration
+	Name   string // The identifier of the argument inside the function
+	Type   uint   // The type of the argument (only Function or Channel)
+}
 
-func (fm *FunctionMetadata) addChannels(newChannels ...ChannelMetadata) {
-	for _, channel := range newChannels {
+// Adds the given metadata about some channel(s) to the FuncMetadata struct
+// In case a channel with the same name already exist then the previous association
+// is overwritten, this is correct since the channel name is the variable to which
+// the channel is assigned and this means that a new assignment was made to that variable
+func (fm *FuncMetadata) addChannels(newChanMeta ...ChanMetadata) {
+	// Adds or updates the associations
+	for _, channel := range newChanMeta {
 		// Checks the validity of the current item
-		if channel.Name != "" && channel.Typing != "" {
-			fm.ScopeChannels[channel.Name] = channel
+		if channel.Name != "" && channel.Type != "" {
+			fm.ChanMeta[channel.Name] = channel
 		}
 	}
 }
 
-func (fm *FunctionMetadata) addTransactions(newTransactions ...Transaction) {
-	for _, transaction := range newTransactions {
-		// Checks the validity of the current item
-		if transaction.IdentName != "" && transaction.From != Unknown && transaction.To != Unknown {
-			// TODO ADD OPTIMIZED VERSION
-			transactionId := fmt.Sprintf("%d-%d", transaction.From, transaction.To)
-			fm.Transactions[transactionId] = transaction
-		}
-	}
-}
-
-func (fm FunctionMetadata) Visit(node ast.Node) ast.Visitor {
+// In order to satify the ast.Visitor interface FuncMetadata implements
+// the Visit() method with this function signature. The Visit method takes as
+// only argument an ast.Node interface and evaluates all the meaninggul cases,
+// when the function steps into that it tries to extract metada from the subtree
+func (fm FuncMetadata) Visit(node ast.Node) ast.Visitor {
 	// Skips empty nodes during descend
 	if node == nil {
 		return nil
 	}
 
-	switch statement := node.(type) {
-	// ! Add it back once implemented (priority given to the builtin concurrency construct)
-	// Generic handler for nested scopes, the single cases arez handled inside the function
-	// case *ast.IfStmt, *ast.SwitchStmt, *ast.TypeSwitchStmt:
-	// GetBranchStmtMetadata(&fm, node)
-	case *ast.ForStmt, *ast.RangeStmt:
-		GetIterationStmtMetadata(&fm, node)
-	// Go routine spawn statement
+	switch stmt := node.(type) {
+	case *ast.IfStmt, *ast.SwitchStmt, *ast.TypeSwitchStmt, *ast.ForStmt, *ast.RangeStmt:
+		fmt.Printf("Meaningful statement reached: %T at line %d\n", stmt, stmt.Pos())
+
+	// Statement to spawn a new Go routine
 	case *ast.GoStmt:
-		spawnTransaction, err := getSpawnTransaction(statement, fm.currentState)
-		if err != nil {
-			log.Fatal(err)
-		}
-		fm.addTransactions(spawnTransaction)
+		ParseGoStmt(stmt, &fm)
 		return nil
+
+	// Statement to send or receive from multiple channel without blocking on each one
 	case *ast.SelectStmt:
-		selectTransaction := GetSelectTransaction(statement, fm.currentState)
-		fm.addTransactions(selectTransaction...)
+		ParseSelectStmt(stmt, &fm)
 		return nil
-	// Send to a channel statement
+
+	// Statement to send some data on a channel
 	case *ast.SendStmt:
-		sendTransaction, err := GetSendTransaction(statement, fm.currentState)
-		if err != nil {
-			log.Fatal(err)
-		}
-		fm.addTransactions(sendTransaction)
+		ParseSendStmt(stmt, &fm)
 		return nil
-	// Possibily, receive from channel
-	case *ast.ExprStmt, *ast.AssignStmt, *ast.DeclStmt:
-		recvTransactions, errRecv := GetRecvTransaction(statement, fm.currentState)
-		callTransactions, errCall := getCallTransaction(statement, fm.currentState)
-		channelsMeta := ExtractChanMetadata(statement)
 
-		if errRecv != nil {
-			log.Fatal(errRecv)
-		} else if len(recvTransactions) > 0 {
-			fm.addTransactions(recvTransactions...)
-		}
+	// Statement for binary or unary expression (channel recv, fucntion call)
+	case *ast.ExprStmt:
+		ParseExprStmt(stmt, &fm)
+		return nil
 
-		if errCall != nil {
-			log.Fatal(errCall)
-		} else if len(callTransactions) > 0 {
-			fm.addTransactions(callTransactions...)
-		}
+	// Statement to assign the value of an expression (chanel recv, channel decl, function call)
+	case *ast.AssignStmt:
+		ParseAssignStmt(stmt, &fm)
+		return nil
 
-		if len(channelsMeta) > 0 {
-			fm.addChannels(channelsMeta...)
-		}
-
+	// Statement to declare a new variable (channel decl)
+	case *ast.DeclStmt:
+		ParseDeclStmt(stmt, &fm)
 		return nil
 	}
 	return fm
 }
 
-func NewFunctionMetadata(stmt *ast.FuncDecl) FunctionMetadata {
+// ----------------------------------------------------------------------------
+// Function related parsing method
+
+// This function parses a FuncDecl statement and saves the data extracted in a
+// FuncMetadata struct. In case of error during execution (external or non Go function)
+// a zero value of abovesaid struct is returned (no error returned).
+func ParseFuncDecl(stmt *ast.FuncDecl) FuncMetadata {
 	// Retrieve function name and arguments
 	funcName := stmt.Name.Name
 	funcArgs := stmt.Type.Params.List
+
 	// Initial setup of the metadata record
-	initialState := 0
-	metadata := FunctionMetadata{
-		funcName,
-		make(map[string]ChannelMetadata),
-		nil,
-		&initialState,
-		make(map[string]Transaction),
+	metadata := FuncMetadata{
+		Name:            funcName,
+		ChanMeta:        make(map[string]ChanMetadata),
+		InlineArgs:      make(map[string]FuncArg),
+		PartialAutomata: NewTransitionGraph(),
 	}
 
-	// The current is an external (non Go) function, not useful for us
+	// If the current is an external (non Go) function then is skipped since
+	// it isn't useful in order to evaluate the choreography of the automa
 	if stmt.Body == nil {
-		return FunctionMetadata{}
+		return FuncMetadata{} // Returns zero value of the struct
 	}
 
-	// If the function has arguments we parse them
+	// If the function has arguments we search for channels or callback/functions since
+	// this are relevant for the Choreography Automata and must be "inlined" later on
 	if len(funcArgs) > 0 {
 		for i, arg := range funcArgs {
-			// Extrapolates the argument name and type, we're only
-			// interested in channel and function since they must be expanded later
+			// Extrapolates the argument name and type
 			argName := arg.Names[0].Name
 			_, isChannel := arg.Type.(*ast.ChanType)
 			_, isFunction := arg.Type.(*ast.FuncType)
 
-			// We're interested only in function and channel passed as arguments
 			if isChannel {
-				newInlineArg := ArgumentToExpand{i, argName, Channel}
-				metadata.InlineArgs = append(metadata.InlineArgs, newInlineArg)
-			}
-
-			// We're interested only in function and channel passed as arguments
-			if isFunction {
-				newInlineArg := ArgumentToExpand{i, argName, Function}
-				metadata.InlineArgs = append(metadata.InlineArgs, newInlineArg)
+				// Adds the channel arg as "to be inlined"
+				newInlineArg := FuncArg{Offset: i, Name: argName, Type: Channel}
+				metadata.InlineArgs[argName] = newInlineArg
+			} else if isFunction {
+				// Adds the function arg as "to be inlined"
+				newInlineArg := FuncArg{Offset: i, Name: argName, Type: Function}
+				metadata.InlineArgs[argName] = newInlineArg
 			}
 		}
 	}
 
+	// Upon completion of the "setup" phase then the body of the
+	// function is visited through the ast.Walk() function in order to
+	// gather additional information about the stmt in the function scope
 	ast.Walk(metadata, stmt.Body)
 
-	// TODO REMOVE
-	// for _, t := range metadata.Transactions {
-	// fmt.Printf("%+v \n", t)
-	// }
-
+	// At last all the data extracted is returned
 	return metadata
 }
 
-func getSpawnTransaction(stmt *ast.GoStmt, currentState *int) (Transaction, error) {
-	transaction := Transaction{Spawn, "", Unknown, Unknown}
-	// Finds out if the function has been defined globally or we're spawning an anonymous function
+// This function parses a GoStmt statement and saves the Transition data extracted
+//  in the given FuncMetadata argument. In case of error during execution no error is returned.
+func ParseGoStmt(stmt *ast.GoStmt, fm *FuncMetadata) {
+	// Determines if GoStmt spawn a Go routine from declared
+	// function or an anonymous function is spawned
 	funcIdent, isFuncIdent := stmt.Call.Fun.(*ast.Ident)
 	_, isFuncAnonymous := stmt.Call.Fun.(*ast.FuncLit)
 
-	// Populates the metadata accordingly
+	// Then extracts the data accoringly
 	if isFuncIdent {
-		// The avaiable function name is set but doesn't inherit scopes (and channels variables)
-		transaction.IdentName = funcIdent.Name
-		// Add state transaction to the automata fragment for the function
-		transaction.From = *currentState
-		(*currentState)++
-		transaction.To = *currentState
+		tSpawn := Transition{Kind: Spawn, IdentName: funcIdent.Name}
+		fm.PartialAutomata.AddTransition(Current, NewNode, tSpawn)
+	} else if isFuncAnonymous {
+		anonFuncName := fmt.Sprintf("%s-%s", AnonymousFunc, fm.Name)
+		tSpawn := Transition{Kind: Spawn, IdentName: anonFuncName}
+		fm.PartialAutomata.AddTransition(Current, NewNode, tSpawn)
+		// ? Add parent avaiableChan
+		// ? Add parse arguments (different from above)
+		// ? Should parse body of funcLiteral (?)
 	}
-
-	if isFuncAnonymous {
-		// The function name is a fallback one, but inherits scopes from the parent/caller
-		transaction.IdentName = AnonymousFunc
-		// Add state transaction to the automata fragment for the function
-		transaction.From = *currentState
-		(*currentState)++
-		transaction.To = *currentState
-		// TODO Add parent avaiableChan
-		// TODO Add parse arguments (different from above)
-		// TODO Should parse body of funcLiteral (?)
-	}
-
-	if !isFuncIdent && !isFuncAnonymous {
-		err := errors.New("func isn't neither anonymous neither locally defined")
-		return Transaction{}, err
-	}
-
-	return transaction, nil
 }
 
-// TODO COMMENT
-func getCallTransaction(stmt ast.Node, currentState *int) ([]Transaction, error) {
-	// Buffer in whic all the extrapolated transaction are saved
-	parsed := []Transaction{}
-	// Based upon the possible expression tyoe extrapolates the data needed
-	switch typedStmt := stmt.(type) {
-	case *ast.AssignStmt:
-		// The assign statement allow for more expression inside it
-		for _, rValue := range typedStmt.Rhs {
-			transaction := parseCallExpr(rValue, currentState)
-			// The expression isn't a recv from a channel
-			if transaction.IdentName == "" {
-				continue
-			}
-			// If the transaction is valid append it to the slice
-			parsed = append(parsed, transaction)
-		}
-	case *ast.ExprStmt:
-		transaction := parseCallExpr(typedStmt.X, currentState)
-		// The expression isn't a recv from a channel
-		if transaction.IdentName == "" {
-			return []Transaction{}, nil
-		}
-		// If the transaction is valid append it to the slice
-		parsed = append(parsed, transaction)
-	}
+// This function parses a CallExpr statement and saves the Transition data extracted
+// in the given FuncMetadata argument. In case of error during execution no error is returned.
+func ParseCallExpr(expr *ast.CallExpr, fm *FuncMetadata) {
+	// Tries to extract the function name (identifier), else throw an exception
+	funcIdent, isIdent := expr.Fun.(*ast.Ident)
 
-	// At last returns the list of transaction extrapolated
-	return parsed, nil
-}
-
-func parseCallExpr(expr ast.Expr, currentState *int) Transaction {
-	// Checks if the given its a unary expression
-	callExpr, isCallExpr := expr.(*ast.CallExpr)
-	if !isCallExpr {
-		return Transaction{}
-	}
-
-	// Checks if the nested expression its an identifier (the channel name)
-	funcIdent, isIdent := callExpr.Fun.(*ast.Ident)
 	if !isIdent {
-		return Transaction{}
+		// ? Consider struct.method() syntax as well (*ast.SelectorExpr)
+		return
 	}
-	// Creates a valid transaction struct
-	transaction := Transaction{Call, funcIdent.Name, Unknown, Unknown}
-	// Add state transaction to the automata fragment for the function
-	transaction.From = *currentState
-	(*currentState)++
-	transaction.To = *currentState
 
-	return transaction
+	// Creates a valid transaction struct
+	tCall := Transition{Kind: Call, IdentName: funcIdent.Name}
+	fm.PartialAutomata.AddTransition(Current, NewNode, tCall)
 }
