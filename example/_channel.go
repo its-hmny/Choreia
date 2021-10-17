@@ -47,7 +47,7 @@ func main() {
 		fmt.Println("Hello from anonymous function")
 	}(3)
 
-	if true {
+	if <-channel; true {
 		void()
 		csc := void()
 	} else if false {
