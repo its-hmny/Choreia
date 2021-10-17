@@ -65,8 +65,13 @@ func (fm FuncMetadata) Visit(node ast.Node) ast.Visitor {
 	}
 
 	switch stmt := node.(type) {
-	case *ast.IfStmt, *ast.SwitchStmt, *ast.TypeSwitchStmt, *ast.ForStmt, *ast.RangeStmt:
+	case *ast.SwitchStmt, *ast.TypeSwitchStmt, *ast.ForStmt, *ast.RangeStmt:
 		fmt.Printf("Meaningful statement reached: %T at line %d\n", stmt, stmt.Pos())
+
+	// Handles all cases (If | If-Else | If-ElseIf-Else)
+	case *ast.IfStmt:
+		ParseIfStmt(stmt, &fm)
+		return nil
 
 	// Statement to spawn a new Go routine
 	case *ast.GoStmt:
