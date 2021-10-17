@@ -34,7 +34,8 @@ const (
 // A struct containing a basic graph implementation that keeps track of the transaction that occur
 // subsequently during the execution flow of a function (or scope).
 type TransitionGraph struct {
-	Nodes []Node // The list of node inside the graph
+	currentId int    // The id of the state from which the new transition (or edge) will start when an id is not specified
+	Nodes     []Node // The list of node inside the graph
 }
 
 type Node struct {
@@ -50,16 +51,29 @@ type Transition struct {
 // This function generates a new TransitionGraph and returns a ref to it
 func NewTransitionGraph() *TransitionGraph {
 	return &TransitionGraph{
+		currentId: 0,
 		Nodes: []Node{
 			{Id: 0, Edges: make(map[int]Transition)},
 		},
 	}
 }
 
+// Returns the last id generated
+func (g *TransitionGraph) GetLastId() int {
+	return len(g.Nodes) - 1
+}
+
+// Set a new rootId, a rootId is the id of the state (node) from which all future transition will start
+// when an id isn't specified, this is used since when merging multiple subgraph is needed that the merge state
+// will become the one from which create new transition even if it is not the last created node
+func (g *TransitionGraph) SetRootId(newRootId int) {
+	g.currentId = newRootId
+}
+
 // This function adds a new Node to the TransitionGraph generating its
 // id incrementally with respects to the previusly existent nodes
 func (g *TransitionGraph) newNode() (id int) {
-	id = len(g.Nodes)
+	id = g.GetLastId() + 1
 	g.Nodes = append(g.Nodes, Node{
 		Id:    id,
 		Edges: make(map[int]Transition),
@@ -82,13 +96,14 @@ func (g *TransitionGraph) AddTransition(from, to int, t Transition) {
 	// The user can omit a specific starting node, in this case the
 	// latest added node id is used as starting point of the edge
 	if from == Current {
-		from = len(g.Nodes) - 1
+		from = g.currentId
 	}
 
 	// The user can omit the ending node of the new edge, in this
 	// case a new node is created and the edge is linked to that one
 	if to == NewNode {
 		to = g.newNode()
+		g.SetRootId(to)
 	}
 
 	fmt.Printf("BP__ %d -> %d \t %+v\n", from, to, t)

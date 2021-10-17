@@ -65,28 +65,41 @@ func ParseRecvStmt(expr *ast.UnaryExpr, fm *FuncMetadata) {
 // This function parses a SelectStmt statement and saves the Transition(s) data extracted
 // in the given FuncMetadata argument. In case of error during execution no error is returned.
 func ParseSelectStmt(stmt *ast.SelectStmt, fm *FuncMetadata) {
-	// TODO Complete implementation
-	for _, bodyStmt := range stmt.Body.List {
+	// Saves a local copy of the current id, all the branch will fork from it
+	currentAutomataId := fm.PartialAutomata.GetLastId()
+	// The id of the state in which all the nested scopes will be merged, will converge
+	// when -2 is to be considered uninitialized , will be initialized correctly on first iteration
+	mergeStateId := NewNode
+
+	for i, bodyStmt := range stmt.Body.List {
 		// Convert the bodyStmt to a CommClause one, this is always possible at the moment
 		// since we're parsing a "select" statement and this is the only option avaiable
 		commClause := bodyStmt.(*ast.CommClause)
 
-		// The current is the default case of the select statement
-		if commClause.Comm == nil {
-			// ? Mark the select as non blocking
-			continue
-		}
+		// Generate an eps-transition to represent the fork/branch (the cases in the select)
+		// and add it as a transaction from the "branch point" saved before
+		startLabel := fmt.Sprintf("select-case-%d-start", i)
+		tEpsStart := Transition{Kind: Eps, IdentName: startLabel}
+		fm.PartialAutomata.AddTransition(currentAutomataId, NewNode, tEpsStart)
 
-		// Determines which type of communication we're evaluating
-		switch commStmt := commClause.Comm.(type) {
-		// A Send to a channel
-		case *ast.SendStmt:
-			fmt.Printf("Found a Send (%T) inside a SelectStmt at line: %d\n", commStmt, commStmt.Pos())
-		// A Receive from a channel
-		case *ast.AssignStmt, *ast.ExprStmt:
-			fmt.Printf("Found a Recv (%T) inside a SelectStmt at line: %d\n", commStmt, commStmt.Pos())
+		// Parses the clause (case stmt) before and then parses the nested block/scopes
+		ast.Walk(fm, commClause)
+
+		// Generates a transition to return/merge to the "main" scope
+		endLabel := fmt.Sprintf("select-case-%d-end", i)
+		tEpsEnd := Transition{Kind: Eps, IdentName: endLabel}
+
+		if mergeStateId == NewNode {
+			// Saves the id, of the merge state for use in next iterations
+			fm.PartialAutomata.AddTransition(Current, NewNode, tEpsEnd)
+			mergeStateId = fm.PartialAutomata.GetLastId()
+		} else {
+			fm.PartialAutomata.AddTransition(Current, mergeStateId, tEpsEnd)
 		}
 	}
+
+	// Set the new root of the PartialAutomata, from which all future transition will start
+	fm.PartialAutomata.SetRootId(mergeStateId)
 }
 
 // Specific function to extrapolate channel metadata from a DeclStmt statement
@@ -143,8 +156,12 @@ func ParseGenDecl(genDecl *ast.GenDecl) []ChanMetadata {
 // about the initialized channel, if at any point errors are encountered then the
 // function returns the zero value of the ChanMetadata struct
 func parseMakeCall(callExpr *ast.CallExpr, chanName string) ChanMetadata {
-	// Tries to extract the function name (identifier), else throw an exception
-	funcIdent := callExpr.Fun.(*ast.Ident)
+	// Tries to extract the function name (identifier), else return a zero value
+	funcIdent, isIdent := callExpr.Fun.(*ast.Ident)
+
+	if !isIdent {
+		return ChanMetadata{}
+	}
 
 	// If we're considering a make function call we ignore the Transition and try
 	// to extract some data about an eventual channel declared
