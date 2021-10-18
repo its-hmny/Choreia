@@ -135,6 +135,8 @@ func ParseGenDecl(genDecl *ast.GenDecl) []ChanMetadata {
 		} else if len(valueSpec.Values) != len(valueSpec.Names) {
 			// Check that the number of rvalues and lvalues are the same
 			return nil
+			// ! log.Fatal("The same number of rvalue and lvalue should be provided")
+			// ! The lengths are different between them
 		}
 
 		// Now iterates over the assignment statements

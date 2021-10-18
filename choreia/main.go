@@ -78,7 +78,7 @@ func main() {
 	if debugFlags != nil && *debugFlags {
 		var debug debugVisitor
 		ast.Walk(debug, f)
-		fmt.Printf("\n------------------------ START DEBUG PRINT------------------------")
+		fmt.Printf("\n------------------------ START DEBUG PRINT------------------------\n")
 	}
 
 	// Extracts the metadata about the given Go file and writes it to a JSON metadata file
