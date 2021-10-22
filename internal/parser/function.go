@@ -65,8 +65,13 @@ func (fm FuncMetadata) Visit(node ast.Node) ast.Visitor {
 	}
 
 	switch stmt := node.(type) {
-	case *ast.ForStmt, *ast.RangeStmt:
-		fmt.Printf("Meaningful statement reached: %T at position %d\n", stmt, stmt.Pos())
+	case *ast.RangeStmt:
+		ParseRangeStmt(stmt, &fm)
+		return nil
+
+	case *ast.ForStmt:
+		ParseForStmt(stmt, &fm)
+		return nil
 
 	case *ast.TypeSwitchStmt:
 		ParseTypeSwitchStmt(stmt, &fm)
