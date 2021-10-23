@@ -38,7 +38,7 @@ func ParseSendStmt(stmt *ast.SendStmt, fm *FuncMetadata) {
 	chanIdent, isIdent := stmt.Chan.(*ast.Ident)
 	if isIdent {
 		tSend := Transition{Kind: Send, IdentName: chanIdent.Name}
-		fm.PartialAutomata.AddTransition(Current, NewNode, tSend)
+		fm.ScopeAutomata.AddTransition(Current, NewNode, tSend)
 	} else {
 		log.Fatalf("Could't find identifier in SendStmt at line: %d\n", stmt.Pos())
 	}
@@ -59,14 +59,14 @@ func ParseRecvStmt(expr *ast.UnaryExpr, fm *FuncMetadata) {
 
 	// Creates a valid transaction struct
 	tRecv := Transition{Kind: Recv, IdentName: chanIdent.Name}
-	fm.PartialAutomata.AddTransition(Current, NewNode, tRecv)
+	fm.ScopeAutomata.AddTransition(Current, NewNode, tRecv)
 }
 
 // This function parses a SelectStmt statement and saves the Transition(s) data extracted
 // in the given FuncMetadata argument. In case of error during execution no error is returned.
 func ParseSelectStmt(stmt *ast.SelectStmt, fm *FuncMetadata) {
 	// Saves a local copy of the current id, all the branch will fork from it
-	currentAutomataId := fm.PartialAutomata.GetLastId()
+	currentAutomataId := fm.ScopeAutomata.GetLastId()
 	// The id of the state in which all the nested scopes will be merged, will converge
 	// when -2 is to be considered uninitialized , will be initialized correctly on first iteration
 	mergeStateId := NewNode
@@ -80,7 +80,7 @@ func ParseSelectStmt(stmt *ast.SelectStmt, fm *FuncMetadata) {
 		// and add it as a transaction from the "branch point" saved before
 		startLabel := fmt.Sprintf("select-case-%d-start", i)
 		tEpsStart := Transition{Kind: Eps, IdentName: startLabel}
-		fm.PartialAutomata.AddTransition(currentAutomataId, NewNode, tEpsStart)
+		fm.ScopeAutomata.AddTransition(currentAutomataId, NewNode, tEpsStart)
 
 		// Parses the clause (case stmt) before and then parses the nested block/scopes
 		ast.Walk(fm, commClause)
@@ -91,15 +91,15 @@ func ParseSelectStmt(stmt *ast.SelectStmt, fm *FuncMetadata) {
 
 		if mergeStateId == NewNode {
 			// Saves the id, of the merge state for use in next iterations
-			fm.PartialAutomata.AddTransition(Current, NewNode, tEpsEnd)
-			mergeStateId = fm.PartialAutomata.GetLastId()
+			fm.ScopeAutomata.AddTransition(Current, NewNode, tEpsEnd)
+			mergeStateId = fm.ScopeAutomata.GetLastId()
 		} else {
-			fm.PartialAutomata.AddTransition(Current, mergeStateId, tEpsEnd)
+			fm.ScopeAutomata.AddTransition(Current, mergeStateId, tEpsEnd)
 		}
 	}
 
 	// Set the new root of the PartialAutomata, from which all future transition will start
-	fm.PartialAutomata.SetRootId(mergeStateId)
+	fm.ScopeAutomata.SetRootId(mergeStateId)
 }
 
 // Specific function to extrapolate channel metadata from a DeclStmt statement

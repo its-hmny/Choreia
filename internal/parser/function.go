@@ -28,10 +28,10 @@ const (
 // extrapolate from the function declaration. Only the function declared in the file
 // by the user are evaluated (built-in and external functions are ignored)
 type FuncMetadata struct {
-	Name            string                  // The identifier of the function
-	ChanMeta        map[string]ChanMetadata // The channels avaiable inside the function scope
-	InlineArgs      map[string]FuncArg      // The argument of the function to be inlined (Callbacks/Functions or Channels)
-	PartialAutomata *TransitionGraph        // A graph representing the transition made inside the function body
+	Name          string                  // The identifier of the function
+	ChanMeta      map[string]ChanMetadata // The channels avaiable inside the function scope
+	InlineArgs    map[string]FuncArg      // The argument of the function to be inlined (Callbacks/Functions or Channels)
+	ScopeAutomata *TransitionGraph        // A graph representing the transition made inside the function body
 }
 
 type FuncArg struct {
@@ -136,10 +136,10 @@ func ParseFuncDecl(stmt *ast.FuncDecl) FuncMetadata {
 
 	// Initial setup of the metadata record
 	metadata := FuncMetadata{
-		Name:            funcName,
-		ChanMeta:        make(map[string]ChanMetadata),
-		InlineArgs:      make(map[string]FuncArg),
-		PartialAutomata: NewTransitionGraph(),
+		Name:          funcName,
+		ChanMeta:      make(map[string]ChanMetadata),
+		InlineArgs:    make(map[string]FuncArg),
+		ScopeAutomata: NewTransitionGraph(),
 	}
 
 	// If the current is an external (non Go) function then is skipped since
@@ -189,11 +189,11 @@ func ParseGoStmt(stmt *ast.GoStmt, fm *FuncMetadata) {
 	// Then extracts the data accoringly
 	if isFuncIdent {
 		tSpawn := Transition{Kind: Spawn, IdentName: funcIdent.Name}
-		fm.PartialAutomata.AddTransition(Current, NewNode, tSpawn)
+		fm.ScopeAutomata.AddTransition(Current, NewNode, tSpawn)
 	} else if isFuncAnonymous {
 		anonFuncName := fmt.Sprintf("%s-%s", AnonymousFunc, fm.Name)
 		tSpawn := Transition{Kind: Spawn, IdentName: anonFuncName}
-		fm.PartialAutomata.AddTransition(Current, NewNode, tSpawn)
+		fm.ScopeAutomata.AddTransition(Current, NewNode, tSpawn)
 		// ? Add parent avaiableChan
 		// ? Add parse arguments (different from above)
 		// ? Should parse body of funcLiteral (?)
@@ -213,5 +213,5 @@ func ParseCallExpr(expr *ast.CallExpr, fm *FuncMetadata) {
 
 	// Creates a valid transaction struct
 	tCall := Transition{Kind: Call, IdentName: funcIdent.Name}
-	fm.PartialAutomata.AddTransition(Current, NewNode, tCall)
+	fm.ScopeAutomata.AddTransition(Current, NewNode, tCall)
 }

@@ -21,12 +21,12 @@ func ParseForStmt(stmt *ast.ForStmt, fm *FuncMetadata) {
 	ast.Walk(fm, stmt.Init)
 	ast.Walk(fm, stmt.Cond) // ? parse BinaryExpr to find transition inside
 	// Saves a local copy of the current id, all the branch will fork from it
-	forkStateId := fm.PartialAutomata.GetLastId()
+	forkStateId := fm.ScopeAutomata.GetLastId()
 
 	// Generate an eps-transition to represent the fork/branch (the iteration scope in the for loop)
 	// and add it as a transaction from the "fork point" saved before
 	tEpsStart := Transition{Kind: Eps, IdentName: "for-iteration-start"}
-	fm.PartialAutomata.AddTransition(forkStateId, NewNode, tEpsStart)
+	fm.ScopeAutomata.AddTransition(forkStateId, NewNode, tEpsStart)
 
 	// Parses the nested block (and then) the post iteration statement
 	ast.Walk(fm, stmt.Body)
@@ -34,10 +34,10 @@ func ParseForStmt(stmt *ast.ForStmt, fm *FuncMetadata) {
 
 	// Links back the iteration block to the fork state
 	tEpsEnd := Transition{Kind: Eps, IdentName: "for-iteration-end"}
-	fm.PartialAutomata.AddTransition(Current, forkStateId, tEpsEnd)
+	fm.ScopeAutomata.AddTransition(Current, forkStateId, tEpsEnd)
 	// Links the fork state to a new one (this represents the no-iteration or exit-iteration cases)
 	tEpsSkip := Transition{Kind: Eps, IdentName: "for-iteration-skip"}
-	fm.PartialAutomata.AddTransition(forkStateId, NewNode, tEpsSkip)
+	fm.ScopeAutomata.AddTransition(forkStateId, NewNode, tEpsSkip)
 }
 
 // This function parses a RangeStmt statement and saves the data extracted in a FuncMetadata struct.
@@ -65,21 +65,21 @@ func ParseRangeStmt(stmt *ast.RangeStmt, fm *FuncMetadata) {
 	// a Recv trnasition since on channel this is the default overload of "range" keyword
 	if matchFound {
 		tEpsStart := Transition{Kind: Recv, IdentName: iterateeIdent.Name}
-		fm.PartialAutomata.AddTransition(Current, NewNode, tEpsStart)
+		fm.ScopeAutomata.AddTransition(Current, NewNode, tEpsStart)
 	} else {
 		tEpsStart := Transition{Kind: Eps, IdentName: "range-iteration-start"}
-		fm.PartialAutomata.AddTransition(Current, NewNode, tEpsStart)
+		fm.ScopeAutomata.AddTransition(Current, NewNode, tEpsStart)
 	}
 
 	// Saves a local copy of the current id, all the branch will fork from it
-	forkStateId := fm.PartialAutomata.GetLastId()
+	forkStateId := fm.ScopeAutomata.GetLastId()
 	// Parses the nested block
 	ast.Walk(fm, stmt.Body)
 
 	// Links back the iteration block to the fork state
 	tEpsEnd := Transition{Kind: Eps, IdentName: "range-iteration-end"}
-	fm.PartialAutomata.AddTransition(Current, forkStateId, tEpsEnd)
+	fm.ScopeAutomata.AddTransition(Current, forkStateId, tEpsEnd)
 	// Links the fork state to a new one (this represents the no-iteration or exit-iteration cases)
 	tEpsSkip := Transition{Kind: Eps, IdentName: "range-iteration-skip"}
-	fm.PartialAutomata.AddTransition(forkStateId, NewNode, tEpsSkip)
+	fm.ScopeAutomata.AddTransition(forkStateId, NewNode, tEpsSkip)
 }
