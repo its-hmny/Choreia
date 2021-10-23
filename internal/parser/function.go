@@ -65,18 +65,22 @@ func (fm FuncMetadata) Visit(node ast.Node) ast.Visitor {
 	}
 
 	switch stmt := node.(type) {
+	// Handle for-range loops (e.g "for index, item := range list")
 	case *ast.RangeStmt:
 		ParseRangeStmt(stmt, &fm)
 		return nil
 
+	// Handles for loop (the classic ones, "for i:= 0; i < 8; i++")
 	case *ast.ForStmt:
 		ParseForStmt(stmt, &fm)
 		return nil
 
+	// Handles TypeSwitch statement (e.g "interface.(type)")
 	case *ast.TypeSwitchStmt:
 		ParseTypeSwitchStmt(stmt, &fm)
 		return nil
 
+	// Handles switch statement
 	case *ast.SwitchStmt:
 		ParseSwitchStmt(stmt, &fm)
 		return nil
