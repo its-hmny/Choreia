@@ -9,6 +9,8 @@ package parser
 
 import (
 	"go/ast"
+
+	"github.com/its-hmny/Choreia/internal/graph"
 )
 
 // ----------------------------------------------------------------------------
@@ -25,19 +27,19 @@ func ParseForStmt(stmt *ast.ForStmt, fm *FuncMetadata) {
 
 	// Generate an eps-transition to represent the fork/branch (the iteration scope in the for loop)
 	// and add it as a transaction from the "fork point" saved before
-	tEpsStart := Transition{Kind: Eps, IdentName: "for-iteration-start"}
-	fm.ScopeAutomata.AddTransition(forkStateId, NewNode, tEpsStart)
+	tEpsStart := graph.Transition{Kind: graph.Eps, IdentName: "for-iteration-start"}
+	fm.ScopeAutomata.AddTransition(forkStateId, graph.NewNode, tEpsStart)
 
 	// Parses the nested block (and then) the post iteration statement
 	ast.Walk(fm, stmt.Body)
 	ast.Walk(fm, stmt.Post)
 
 	// Links back the iteration block to the fork state
-	tEpsEnd := Transition{Kind: Eps, IdentName: "for-iteration-end"}
-	fm.ScopeAutomata.AddTransition(Current, forkStateId, tEpsEnd)
+	tEpsEnd := graph.Transition{Kind: graph.Eps, IdentName: "for-iteration-end"}
+	fm.ScopeAutomata.AddTransition(graph.Current, forkStateId, tEpsEnd)
 	// Links the fork state to a new one (this represents the no-iteration or exit-iteration cases)
-	tEpsSkip := Transition{Kind: Eps, IdentName: "for-iteration-skip"}
-	fm.ScopeAutomata.AddTransition(forkStateId, NewNode, tEpsSkip)
+	tEpsSkip := graph.Transition{Kind: graph.Eps, IdentName: "for-iteration-skip"}
+	fm.ScopeAutomata.AddTransition(forkStateId, graph.NewNode, tEpsSkip)
 }
 
 // This function parses a RangeStmt statement and saves the data extracted in a FuncMetadata struct.
@@ -64,11 +66,11 @@ func ParseRangeStmt(stmt *ast.RangeStmt, fm *FuncMetadata) {
 	// and add it as a transaction, if we're using range on a channel then the transition becames
 	// a Recv trnasition since on channel this is the default overload of "range" keyword
 	if matchFound {
-		tEpsStart := Transition{Kind: Recv, IdentName: iterateeIdent.Name}
-		fm.ScopeAutomata.AddTransition(Current, NewNode, tEpsStart)
+		tEpsStart := graph.Transition{Kind: graph.Recv, IdentName: iterateeIdent.Name}
+		fm.ScopeAutomata.AddTransition(graph.Current, graph.NewNode, tEpsStart)
 	} else {
-		tEpsStart := Transition{Kind: Eps, IdentName: "range-iteration-start"}
-		fm.ScopeAutomata.AddTransition(Current, NewNode, tEpsStart)
+		tEpsStart := graph.Transition{Kind: graph.Eps, IdentName: "range-iteration-start"}
+		fm.ScopeAutomata.AddTransition(graph.Current, graph.NewNode, tEpsStart)
 	}
 
 	// Saves a local copy of the current id, all the branch will fork from it
@@ -77,9 +79,9 @@ func ParseRangeStmt(stmt *ast.RangeStmt, fm *FuncMetadata) {
 	ast.Walk(fm, stmt.Body)
 
 	// Links back the iteration block to the fork state
-	tEpsEnd := Transition{Kind: Eps, IdentName: "range-iteration-end"}
-	fm.ScopeAutomata.AddTransition(Current, forkStateId, tEpsEnd)
+	tEpsEnd := graph.Transition{Kind: graph.Eps, IdentName: "range-iteration-end"}
+	fm.ScopeAutomata.AddTransition(graph.Current, forkStateId, tEpsEnd)
 	// Links the fork state to a new one (this represents the no-iteration or exit-iteration cases)
-	tEpsSkip := Transition{Kind: Eps, IdentName: "range-iteration-skip"}
-	fm.ScopeAutomata.AddTransition(forkStateId, NewNode, tEpsSkip)
+	tEpsSkip := graph.Transition{Kind: graph.Eps, IdentName: "range-iteration-skip"}
+	fm.ScopeAutomata.AddTransition(forkStateId, graph.NewNode, tEpsSkip)
 }

@@ -1,10 +1,10 @@
 // Copyright Enea Guidi (hmny).
 
-// This package handles the parsing of a given *ast.File which represents
-// the content of a Go source file as an Abstract Syntax Tree.
+// This package implements a Graph data structure and its own API.
+// For this specific use cases the implementation is quite simple & basic
 
 // The only method avaiable from the outside are Transitiongraph and its API
-package parser
+package graph
 
 import (
 	"fmt"

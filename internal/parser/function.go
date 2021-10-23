@@ -10,6 +10,8 @@ package parser
 import (
 	"fmt"
 	"go/ast"
+
+	"github.com/its-hmny/Choreia/internal/graph"
 )
 
 const (
@@ -31,7 +33,7 @@ type FuncMetadata struct {
 	Name          string                  // The identifier of the function
 	ChanMeta      map[string]ChanMetadata // The channels avaiable inside the function scope
 	InlineArgs    map[string]FuncArg      // The argument of the function to be inlined (Callbacks/Functions or Channels)
-	ScopeAutomata *TransitionGraph        // A graph representing the transition made inside the function body
+	ScopeAutomata *graph.TransitionGraph  // A graph representing the transition made inside the function body
 }
 
 type FuncArg struct {
@@ -139,7 +141,7 @@ func ParseFuncDecl(stmt *ast.FuncDecl) FuncMetadata {
 		Name:          funcName,
 		ChanMeta:      make(map[string]ChanMetadata),
 		InlineArgs:    make(map[string]FuncArg),
-		ScopeAutomata: NewTransitionGraph(),
+		ScopeAutomata: graph.NewTransitionGraph(),
 	}
 
 	// If the current is an external (non Go) function then is skipped since
@@ -188,12 +190,12 @@ func ParseGoStmt(stmt *ast.GoStmt, fm *FuncMetadata) {
 
 	// Then extracts the data accoringly
 	if isFuncIdent {
-		tSpawn := Transition{Kind: Spawn, IdentName: funcIdent.Name}
-		fm.ScopeAutomata.AddTransition(Current, NewNode, tSpawn)
+		tSpawn := graph.Transition{Kind: graph.Spawn, IdentName: funcIdent.Name}
+		fm.ScopeAutomata.AddTransition(graph.Current, graph.NewNode, tSpawn)
 	} else if isFuncAnonymous {
 		anonFuncName := fmt.Sprintf("%s-%s", AnonymousFunc, fm.Name)
-		tSpawn := Transition{Kind: Spawn, IdentName: anonFuncName}
-		fm.ScopeAutomata.AddTransition(Current, NewNode, tSpawn)
+		tSpawn := graph.Transition{Kind: graph.Spawn, IdentName: anonFuncName}
+		fm.ScopeAutomata.AddTransition(graph.Current, graph.NewNode, tSpawn)
 		// ? Add parent avaiableChan
 		// ? Add parse arguments (different from above)
 		// ? Should parse body of funcLiteral (?)
@@ -212,6 +214,6 @@ func ParseCallExpr(expr *ast.CallExpr, fm *FuncMetadata) {
 	}
 
 	// Creates a valid transaction struct
-	tCall := Transition{Kind: Call, IdentName: funcIdent.Name}
-	fm.ScopeAutomata.AddTransition(Current, NewNode, tCall)
+	tCall := graph.Transition{Kind: graph.Call, IdentName: funcIdent.Name}
+	fm.ScopeAutomata.AddTransition(graph.Current, graph.NewNode, tCall)
 }
