@@ -63,6 +63,18 @@ func (g *TransitionGraph) GetLastId() int {
 	return len(g.Nodes) - 1
 }
 
+// Returns the id of the final state, if such state is not present, returns the last generated id
+func (g *TransitionGraph) GetFinalStateId() int {
+	for _, node := range g.Nodes {
+		// The final state is the one for which there aren't any outcoming edges
+		if len(node.Edges) == 0 {
+			return node.Id
+		}
+	}
+
+	return g.GetLastId()
+}
+
 // Set a new rootId, a rootId is the id of the state (node) from which all future transition will start
 // when an id isn't specified, this is used since when merging multiple subgraph is needed that the merge state
 // will become the one from which create new transition even if it is not the last created node
@@ -112,41 +124,45 @@ func (g *TransitionGraph) AddTransition(from, to int, t Transition) {
 	g.Nodes[from].Edges[to] = t
 }
 
-/*
-? Can be useful later
-// Neighbors : returns a list of node IDs that are linked to this node
-func (g *Graph) Neighbors(id int) []int {
-	neighbors := []int{}
-	for _, node := range g.nodes {
-		for edge := range node.edges {
-			if node.id == id {
-				neighbors = append(neighbors, edge)
-			}
-			if edge == id {
-				neighbors = append(neighbors, node.id)
-			}
+// This function expands a graph in place of an edge/transition. Since in our case every
+// Automata/Graph has only one initial and final state then we simply copy the other graph
+// node by node and edge by edge and then we link the copy to the "from" and "to" nodes
+func (g *TransitionGraph) ExpandInPlace(from, to int, other TransitionGraph) {
+	// First of all remove the old call transition (since it will be expanded)
+	delete(g.Nodes[from].Edges, to)
+	// Calculate the offset from which the ids of the "other" will be padded with
+	offset := len(g.Nodes)
+
+	// Copies the "other" graph node, applying the offset to each id
+	for _, cpNode := range other.Nodes {
+		// Creates a new edge map for and copies all the edges to it
+		newNodeEdges := make(map[int]Transition)
+		for dest, t := range cpNode.Edges {
+			newDest := offset + dest
+			newNodeEdges[newDest] = t
 		}
+		// Then creates a new node and adds it to the destination graph
+		newNode := Node{Id: offset + cpNode.Id, Edges: newNodeEdges}
+		g.Nodes = append(g.Nodes, newNode)
 	}
-	return neighbors
+
+	// Eps transition to mark/link the start of the expanded/copied graph
+	tExpansionStart := Transition{Kind: Eps, IdentName: "start-call-expansion"}
+	tExpansionEnd := Transition{Kind: Eps, IdentName: "end-call-expansion"}
+	// Initial and final state of the freshly copied graph
+	copyInitialStateId, copyFinalStateId := offset, other.GetFinalStateId()
+	// The "linking" transition are now added to the graph, completing the expansion
+	g.AddTransition(from, copyInitialStateId, tExpansionStart)
+	g.AddTransition(copyFinalStateId, to, tExpansionEnd)
 }
 
-// Nodes : returns a list of node IDs
-func (g *Graph) Nodes() []int {
-	nodes := make([]int, len(g.nodes))
-	for i := range g.nodes {
-		nodes[i] = i
-	}
-	return nodes
-}
-
-// Edges : returns a list of edges with weights
-func (g *Graph) Edges() [][3]int {
-	edges := make([][3]int, 0, len(g.nodes))
-	for i := range g.nodes {
-		for k, v := range g.nodes[i].edges {
-			edges = append(edges, [3]int{i, k, int(v)})
+// This function provides a simple mechanism to execute a function on each
+// edge of the graph. For convenience a ref to the transition is passed so that the
+// callback function can possibly change the transition if needed
+func (g *TransitionGraph) ForEachTransition(toExecute func(from, to int, t *Transition)) {
+	for _, node := range g.Nodes {
+		for dest, edge := range node.Edges {
+			toExecute(node.Id, dest, &edge)
 		}
 	}
-	return edges
 }
-*/
