@@ -92,7 +92,7 @@ func (fm FileMetadata) Visit(node ast.Node) ast.Visitor {
 // This function handles the extraction of metadata about the given file, it simply
 // receives an *ast.File as input and call ast.Walk on it. Whenever it encounters something
 // interesting such as global channel or function declaration it saves the metadata avaiable
-func ParseFile(file *ast.File) FileMetadata {
+func ParseAstFile(file *ast.File) FileMetadata {
 	// Intializes the FileMetadata struct
 	metadata := FileMetadata{
 		GlobalChanMeta: map[string]ChanMetadata{},

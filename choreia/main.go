@@ -3,7 +3,7 @@
 // This package contains the entry point of the whole program, it handles
 // directly all the interaction with its utility module with the final pourpose
 // of extracting a Choreography Automata from the given input file
-package main
+package main // TODO refactor
 
 import (
 	"encoding/json"
@@ -17,7 +17,10 @@ import (
 
 	"github.com/pborman/getopt/v2"
 
-	choreia_parser "github.com/its-hmny/Choreia/internal/parser"
+	// Choreia internal module for CDA handling
+	"github.com/its-hmny/Choreia/internal/automata"
+	// Choreia internal parser module
+	chr_parser "github.com/its-hmny/Choreia/internal/parser"
 )
 
 // ! Only for debugging pourposes will be removed later
@@ -41,19 +44,15 @@ func main() {
 	inputFile := getopt.StringLong("input", 'i', "", "The .go file from which extract the Choreography Automata")
 	traceFlags := getopt.BoolLong("trace", 't', "Pretty prints on the console the AST", "false")
 	getopt.BoolLong("help", 'h', "Display this help message", "false")
-	// ! Only for debugging pourposes will be removed later
-	debugFlags := getopt.BoolLong("debug", 'd', "Pretty prints on the console the AST", "false")
 
 	// Parse the program arguments
 	getopt.Parse()
 
-	// Checks for the existence of an input file
-	if inputFile == nil && *inputFile == "" {
+	if inputFile == nil && *inputFile == "" { // Checks for the existence of input file
 		getopt.Usage()
 		return
-	}
-	// Checks that the given input path actually exists
-	if fStat, err := os.Stat(*inputFile); os.IsNotExist(err) || fStat.IsDir() {
+	} else if fStat, err := os.Stat(*inputFile); os.IsNotExist(err) || fStat.IsDir() {
+		// Checks that the given input path actually exists
 		log.Fatal("A path to an existing go source file is neeeded")
 	}
 
@@ -75,20 +74,26 @@ func main() {
 	}
 
 	// ! Debug Visitor to print to terminal in a more human readable manner the AST
-	if debugFlags != nil && *debugFlags {
-		var debug debugVisitor
-		ast.Walk(debug, f)
-		fmt.Printf("\n------------------------ START DEBUG PRINT------------------------\n")
-	}
+	var debug debugVisitor
+	ast.Walk(debug, f)
 
+	fmt.Println(`
+		    ------------------------ PARSER DEBUG PRINT ------------------------
+	`)
 	// Extracts the metadata about the given Go file and writes it to a JSON metadata file
-	fileMetadata := choreia_parser.ParseFile(f)
+	fileMetadata := chr_parser.ParseAstFile(f)
+
+	fmt.Println(`
+		--------------------------- CDA DEBUG PRINT ---------------------------
+	`)
+	// Uses the metadata to generate a Deterministic Choreography Automata (DCA)
+	automata.GenerateDCA(fileMetadata)
+
+	// ! Temporary, will be removed later
 	fileDump, fileErr := os.Create("file_meta.json")
 	jsonDump, jsonErr := json.MarshalIndent(fileMetadata, "", "  ")
-
 	if jsonErr != nil || fileErr != nil {
 		log.Fatal("Error encountered while writing JSON metadata file")
 	}
-
 	fileDump.WriteString(string(jsonDump))
 }
