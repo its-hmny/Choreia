@@ -16,4 +16,4 @@ bin
 # vendor/
 
 # Parsing phase output metadata
-file_meta.json
+debug/

@@ -90,10 +90,15 @@ func main() {
 	automata.GenerateDCA(fileMetadata)
 
 	// ! Temporary, will be removed later
-	fileDump, fileErr := os.Create("file_meta.json")
+	fileDump, fileErr := os.Create("debug/file_meta.json")
 	jsonDump, jsonErr := json.MarshalIndent(fileMetadata, "", "  ")
 	if jsonErr != nil || fileErr != nil {
 		log.Fatal("Error encountered while writing JSON metadata file")
 	}
 	fileDump.WriteString(string(jsonDump))
+
+	// ! Debugging export as png of the graphs
+	for name, meta := range fileMetadata.FunctionMeta {
+		meta.ScopeAutomata.ExportAsPNG(fmt.Sprintf("debug/%s.png", name))
+	}
 }

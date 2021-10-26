@@ -9,6 +9,9 @@ package graph
 import (
 	"fmt"
 	"log"
+
+	"github.com/goccy/go-graphviz"
+	"github.com/goccy/go-graphviz/cgraph"
 )
 
 const (
@@ -150,7 +153,7 @@ func (g *TransitionGraph) ExpandInPlace(from, to int, other TransitionGraph) {
 	tExpansionStart := Transition{Kind: Eps, IdentName: "start-call-expansion"}
 	tExpansionEnd := Transition{Kind: Eps, IdentName: "end-call-expansion"}
 	// Initial and final state of the freshly copied graph
-	copyInitialStateId, copyFinalStateId := offset, other.GetFinalStateId()
+	copyInitialStateId, copyFinalStateId := offset, other.GetFinalStateId()+offset
 	// The "linking" transition are now added to the graph, completing the expansion
 	g.AddTransition(from, copyInitialStateId, tExpansionStart)
 	g.AddTransition(copyFinalStateId, to, tExpansionEnd)
@@ -165,4 +168,52 @@ func (g *TransitionGraph) ForEachTransition(toExecute func(from, to int, t *Tran
 			toExecute(node.Id, dest, &edge)
 		}
 	}
+}
+
+// This function exports a .png image of the current state of the Graph, it copies node by node
+// and then edge by edge the graph upon which is called, and then saves the GraphViz copy as
+// a .png image file to the provided path
+func (graph *TransitionGraph) ExportAsPNG(imagePath string) {
+	// Creates a GraphViz instance and initializes a Graph instance
+	graphvizInstance := graphviz.New()
+	graphRender, err := graphvizInstance.Graph()
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Initializes a map that will map the TransitionGraph node's id to a cgraph.Node pointer (a copy of
+	// the node that will be rendered). This will be used to render the edges later on
+	associationMap := make(map[int]*cgraph.Node)
+
+	// Bulk copy of TransitionGraph.Nodes into renderGraph
+	for _, node := range graph.Nodes {
+		renderNode, _ := graphRender.CreateNode(fmt.Sprint(node.Id))
+		associationMap[node.Id] = renderNode
+	}
+
+	// Bulk copy of TransitionGraph.Edges into renderGraph
+	for _, node := range graph.Nodes {
+		for destId, transition := range node.Edges {
+			from := associationMap[node.Id]
+			to := associationMap[destId]
+			edgeId := fmt.Sprintf("%d-%d", node.Id, destId)
+			renderEdge, _ := graphRender.CreateEdge(edgeId, from, to)
+			edgeLabel := fmt.Sprintf("%s %s", transition.Kind, transition.IdentName)
+			renderEdge.SetLabel(edgeLabel)
+		}
+	}
+
+	// Creates a .png export, that saves in current working directory
+	if err := graphvizInstance.RenderFilename(graphRender, graphviz.PNG, imagePath); err != nil {
+		log.Fatal(err)
+	}
+
+	// Cleanup function that closes both the Graph and GraphViz instances
+	defer func() {
+		if err := graphRender.Close(); err != nil {
+			log.Fatal(err)
+		}
+		graphvizInstance.Close()
+	}()
 }
