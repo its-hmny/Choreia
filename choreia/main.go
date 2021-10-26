@@ -83,6 +83,9 @@ func main() {
 	// Extracts the metadata about the given Go file and writes it to a JSON metadata file
 	fileMetadata := chr_parser.ParseAstFile(f)
 
+	// ! For debugging pourposes, to be removed
+	fileMetadata.FunctionMeta["main"].ScopeAutomata.ExportAsSVG("debug/prev.svg")
+
 	fmt.Println(`
 		--------------------------- CDA DEBUG PRINT ---------------------------
 	`)
@@ -99,6 +102,6 @@ func main() {
 
 	// ! Debugging export as png of the graphs
 	for name, meta := range fileMetadata.FunctionMeta {
-		meta.ScopeAutomata.ExportAsPNG(fmt.Sprintf("debug/%s.png", name))
+		meta.ScopeAutomata.ExportAsSVG(fmt.Sprintf("debug/%s.svg", name))
 	}
 }

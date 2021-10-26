@@ -61,6 +61,24 @@ func NewTransitionGraph() *TransitionGraph {
 	}
 }
 
+// Converting the Transition struct to String format.
+func (t Transition) String() string {
+	switch t.Kind {
+	case Eps:
+		return fmt.Sprintf("%q %s", '\u03B5', t.IdentName)
+	case Recv:
+		return fmt.Sprintf("%q %s", '\u2190', t.IdentName)
+	case Send:
+		return fmt.Sprintf("%q %s", '\u2192', t.IdentName)
+	case Call:
+		return fmt.Sprintf("%q %s", '\u2A0F', t.IdentName)
+	case Spawn:
+		return fmt.Sprintf("%q %s", '\u22C1', t.IdentName)
+	default:
+		return fmt.Sprintf("%q %s", '\u2048', t.IdentName)
+	}
+}
+
 // Returns the last id generated
 func (g *TransitionGraph) GetLastId() int {
 	return len(g.Nodes) - 1
@@ -173,7 +191,7 @@ func (g *TransitionGraph) ForEachTransition(toExecute func(from, to int, t *Tran
 // This function exports a .png image of the current state of the Graph, it copies node by node
 // and then edge by edge the graph upon which is called, and then saves the GraphViz copy as
 // a .png image file to the provided path
-func (graph *TransitionGraph) ExportAsPNG(imagePath string) {
+func (graph *TransitionGraph) ExportAsSVG(imagePath string) {
 	// Creates a GraphViz instance and initializes a Graph instance
 	graphvizInstance := graphviz.New()
 	graphRender, err := graphvizInstance.Graph()
@@ -199,13 +217,12 @@ func (graph *TransitionGraph) ExportAsPNG(imagePath string) {
 			to := associationMap[destId]
 			edgeId := fmt.Sprintf("%d-%d", node.Id, destId)
 			renderEdge, _ := graphRender.CreateEdge(edgeId, from, to)
-			edgeLabel := fmt.Sprintf("%s %s", transition.Kind, transition.IdentName)
-			renderEdge.SetLabel(edgeLabel)
+			renderEdge.SetLabel(fmt.Sprint(transition))
 		}
 	}
 
 	// Creates a .png export, that saves in current working directory
-	if err := graphvizInstance.RenderFilename(graphRender, graphviz.PNG, imagePath); err != nil {
+	if err := graphvizInstance.RenderFilename(graphRender, graphviz.SVG, imagePath); err != nil {
 		log.Fatal(err)
 	}
 
