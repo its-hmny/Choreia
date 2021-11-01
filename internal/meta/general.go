@@ -6,7 +6,7 @@
 // The only method avaiable from the outside is ParseAssignStmt and ParseExprStmt,
 // both are two generic statement in which multiple interesting thing can occur
 // and this method acts as "orchestrator" of their specilized counterparts
-package parser
+package meta
 
 import (
 	"go/ast"
@@ -16,7 +16,7 @@ import (
 // This function parses an AssignStmt statement and evaluates all the possible cases for it.
 // In particular this statement can have a recv from a channel, a function call or a channel init
 // all three with the return value then assigned to a variable/identifier
-func ParseAssignStmt(stmt *ast.AssignStmt, fm *FuncMetadata) {
+func parseAssignStmt(stmt *ast.AssignStmt, fm *FuncMetadata) {
 	// Check that the number of rvalues are the same of lvalues (values assignments) in the statement
 	if len(stmt.Lhs) != len(stmt.Rhs) {
 		log.Fatalf("Not the same number of lVal and rVal in AssignStmt at line %d\n", stmt.Pos())
@@ -31,12 +31,12 @@ func ParseAssignStmt(stmt *ast.AssignStmt, fm *FuncMetadata) {
 		switch castStmt := rVal.(type) {
 		// Function call (+ assignment) or channel init
 		case *ast.CallExpr:
-			ParseCallExpr(castStmt, fm)
+			parseCallExpr(castStmt, fm)
 			chanMeta := parseMakeCall(castStmt, identName.Name)
 			fm.addChannels(chanMeta)
 		// Receive (+ assignment) from a channel
 		case *ast.UnaryExpr:
-			ParseRecvStmt(castStmt, fm)
+			parseRecvStmt(castStmt, fm)
 		}
 	}
 }
@@ -44,12 +44,12 @@ func ParseAssignStmt(stmt *ast.AssignStmt, fm *FuncMetadata) {
 // This function parses an ExprStmt statement and evaluates all the possible cases for it.
 // In particular this statement can have a recv from a channel or a function call, both transition
 // are extracted and handled specifically
-func ParseExprStmt(stmt *ast.ExprStmt, fm *FuncMetadata) {
+func parseExprStmt(stmt *ast.ExprStmt, fm *FuncMetadata) {
 	switch castStmt := stmt.X.(type) {
 	case *ast.CallExpr:
-		ParseCallExpr(castStmt, fm)
+		parseCallExpr(castStmt, fm)
 	case *ast.UnaryExpr:
-		ParseRecvStmt(castStmt, fm)
+		parseRecvStmt(castStmt, fm)
 	}
 
 }

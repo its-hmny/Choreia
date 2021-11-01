@@ -5,7 +5,7 @@
 
 // The only method avaiable from the outside is ParseFuncDecl, ParseGoStmt and ParseCallExpr which
 // will add to the given FileMetadata argument the data collected from the parsing phases
-package parser
+package meta
 
 import (
 	"fmt"
@@ -15,10 +15,10 @@ import (
 )
 
 const (
-	AnonymousFunc = "anonymousFunc" // Constant to identify anonymous function
-
-	Function = iota // Possible value of FuncArg.type
+	Function ArgType = iota // Possible value of FuncArg.type
 	Channel
+
+	anonymousFunc = "anonymousFunc" // Constant to identify anonymous function
 )
 
 // ----------------------------------------------------------------------------
@@ -37,10 +37,12 @@ type FuncMetadata struct {
 }
 
 type FuncArg struct {
-	Offset int    // The position of the arg in the function declaration
-	Name   string // The identifier of the argument inside the function
-	Type   uint   // The type of the argument (only Function or Channel)
+	Offset int     // The position of the arg in the function declaration
+	Name   string  // The identifier of the argument inside the function
+	Type   ArgType // The type of the argument (only Function or Channel)
 }
+
+type ArgType int
 
 // Adds the given metadata about some channel(s) to the FuncMetadata struct
 // In case a channel with the same name already exist then the previous association
@@ -69,57 +71,57 @@ func (fm FuncMetadata) Visit(node ast.Node) ast.Visitor {
 	switch stmt := node.(type) {
 	// Handle for-range loops (e.g "for index, item := range list")
 	case *ast.RangeStmt:
-		ParseRangeStmt(stmt, &fm)
+		parseRangeStmt(stmt, &fm)
 		return nil
 
 	// Handles for loop (the classic ones, "for i:= 0; i < 8; i++")
 	case *ast.ForStmt:
-		ParseForStmt(stmt, &fm)
+		parseForStmt(stmt, &fm)
 		return nil
 
 	// Handles TypeSwitch statement (e.g "interface.(type)")
 	case *ast.TypeSwitchStmt:
-		ParseTypeSwitchStmt(stmt, &fm)
+		parseTypeSwitchStmt(stmt, &fm)
 		return nil
 
 	// Handles switch statement
 	case *ast.SwitchStmt:
-		ParseSwitchStmt(stmt, &fm)
+		parseSwitchStmt(stmt, &fm)
 		return nil
 
 	// Handles all cases (If | If-Else | If-ElseIf-Else)
 	case *ast.IfStmt:
-		ParseIfStmt(stmt, &fm)
+		parseIfStmt(stmt, &fm)
 		return nil
 
 	// Statement to spawn a new Go routine
 	case *ast.GoStmt:
-		ParseGoStmt(stmt, &fm)
+		parseGoStmt(stmt, &fm)
 		return nil
 
 	// Statement to send or receive from multiple channel without blocking on each one
 	case *ast.SelectStmt:
-		ParseSelectStmt(stmt, &fm)
+		parseSelectStmt(stmt, &fm)
 		return nil
 
 	// Statement to send some data on a channel
 	case *ast.SendStmt:
-		ParseSendStmt(stmt, &fm)
+		parseSendStmt(stmt, &fm)
 		return nil
 
 	// Statement for binary or unary expression (channel recv, fucntion call)
 	case *ast.ExprStmt:
-		ParseExprStmt(stmt, &fm)
+		parseExprStmt(stmt, &fm)
 		return nil
 
 	// Statement to assign the value of an expression (chanel recv, channel decl, function call)
 	case *ast.AssignStmt:
-		ParseAssignStmt(stmt, &fm)
+		parseAssignStmt(stmt, &fm)
 		return nil
 
 	// Statement to declare a new variable (channel decl)
 	case *ast.DeclStmt:
-		ParseDeclStmt(stmt, &fm)
+		parseDeclStmt(stmt, &fm)
 		return nil
 	}
 	return fm
@@ -131,7 +133,7 @@ func (fm FuncMetadata) Visit(node ast.Node) ast.Visitor {
 // This function parses a FuncDecl statement and saves the data extracted in a
 // FuncMetadata struct. In case of error during execution (external or non Go function)
 // a zero value of abovesaid struct is returned (no error returned).
-func ParseFuncDecl(stmt *ast.FuncDecl) FuncMetadata {
+func parseFuncDecl(stmt *ast.FuncDecl) FuncMetadata {
 	// Retrieve function name and arguments
 	funcName := stmt.Name.Name
 	funcArgs := stmt.Type.Params.List
@@ -182,7 +184,7 @@ func ParseFuncDecl(stmt *ast.FuncDecl) FuncMetadata {
 
 // This function parses a GoStmt statement and saves the Transition data extracted
 //  in the given FuncMetadata argument. In case of error during execution no error is returned.
-func ParseGoStmt(stmt *ast.GoStmt, fm *FuncMetadata) {
+func parseGoStmt(stmt *ast.GoStmt, fm *FuncMetadata) {
 	// Determines if GoStmt spawn a Go routine from declared
 	// function or an anonymous function is spawned
 	funcIdent, isFuncIdent := stmt.Call.Fun.(*ast.Ident)
@@ -193,7 +195,7 @@ func ParseGoStmt(stmt *ast.GoStmt, fm *FuncMetadata) {
 		tSpawn := graph.Transition{Kind: graph.Spawn, IdentName: funcIdent.Name}
 		fm.ScopeAutomata.AddTransition(graph.Current, graph.NewNode, tSpawn)
 	} else if isFuncAnonymous {
-		anonFuncName := fmt.Sprintf("%s-%s", AnonymousFunc, fm.Name)
+		anonFuncName := fmt.Sprintf("%s-%s", anonymousFunc, fm.Name)
 		tSpawn := graph.Transition{Kind: graph.Spawn, IdentName: anonFuncName}
 		fm.ScopeAutomata.AddTransition(graph.Current, graph.NewNode, tSpawn)
 		// ? Add parent avaiableChan
@@ -204,7 +206,7 @@ func ParseGoStmt(stmt *ast.GoStmt, fm *FuncMetadata) {
 
 // This function parses a CallExpr statement and saves the Transition data extracted
 // in the given FuncMetadata argument. In case of error during execution no error is returned.
-func ParseCallExpr(expr *ast.CallExpr, fm *FuncMetadata) {
+func parseCallExpr(expr *ast.CallExpr, fm *FuncMetadata) {
 	// Tries to extract the function name (identifier), else throw an exception
 	funcIdent, isIdent := expr.Fun.(*ast.Ident)
 

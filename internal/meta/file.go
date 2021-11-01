@@ -5,7 +5,7 @@
 
 // The only method avaiable from the outside is ParseFile which, as the name suggest, will return
 // a FileMetadata struct containing some info needed by the caller for further uses.
-package parser
+package meta
 
 import (
 	"fmt"
@@ -68,13 +68,13 @@ func (fm FileMetadata) Visit(node ast.Node) ast.Visitor {
 	switch stmt := node.(type) {
 	// In this case we're interested in extrapolating info about global channel declaration
 	case *ast.GenDecl:
-		newChannels := ParseGenDecl(stmt)
+		newChannels := parseGenDecl(stmt)
 		fm.addChannelMeta(newChannels...)
 		return nil
 	// Obvoiusly we want to extrapolate data about the declared function (and their action)
 	case *ast.FuncDecl:
 		fmt.Printf("\nParsing function '%s'\n", stmt.Name.Name)
-		newFunction := ParseFuncDecl(stmt)
+		newFunction := parseFuncDecl(stmt)
 		fm.addFunctionMeta(newFunction)
 		return nil
 	// Error handling case
@@ -92,7 +92,7 @@ func (fm FileMetadata) Visit(node ast.Node) ast.Visitor {
 // This function handles the extraction of metadata about the given file, it simply
 // receives an *ast.File as input and call ast.Walk on it. Whenever it encounters something
 // interesting such as global channel or function declaration it saves the metadata avaiable
-func ParseAstFile(file *ast.File) FileMetadata {
+func parseAstFile(file *ast.File) FileMetadata {
 	// Intializes the FileMetadata struct
 	metadata := FileMetadata{
 		GlobalChanMeta: map[string]ChanMetadata{},

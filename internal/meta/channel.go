@@ -6,7 +6,7 @@
 // The only method avaiable from the outside is ParseGenDecl, ParseDeclStmt, ParseSendStmt,
 // ParseRecvStmt and ParseSelectStmt which will add to the given FileMetadata argument the
 // data collected from the parsing phases
-package parser
+package meta
 
 import (
 	"fmt"
@@ -36,7 +36,7 @@ type ChanMetadata struct {
 
 // This function parses a SendStmt statement and saves the Transition(s) data extracted
 // in the given FuncMetadata argument. In case of error during execution no error is returned.
-func ParseSendStmt(stmt *ast.SendStmt, fm *FuncMetadata) {
+func parseSendStmt(stmt *ast.SendStmt, fm *FuncMetadata) {
 	chanIdent, isIdent := stmt.Chan.(*ast.Ident)
 	if isIdent {
 		tSend := graph.Transition{Kind: graph.Send, IdentName: chanIdent.Name}
@@ -49,7 +49,7 @@ func ParseSendStmt(stmt *ast.SendStmt, fm *FuncMetadata) {
 // This function parses a UnaryExpr statement and saves the Transition(s) data extracted
 // in the given FuncMetadata argument. In case of error during execution no error is returned.
 // It search for Recv transition (receive from a channel)
-func ParseRecvStmt(expr *ast.UnaryExpr, fm *FuncMetadata) {
+func parseRecvStmt(expr *ast.UnaryExpr, fm *FuncMetadata) {
 	// Tries to extract the identifier of the expression
 	chanIdent, isIdent := expr.X.(*ast.Ident)
 
@@ -66,7 +66,7 @@ func ParseRecvStmt(expr *ast.UnaryExpr, fm *FuncMetadata) {
 
 // This function parses a SelectStmt statement and saves the Transition(s) data extracted
 // in the given FuncMetadata argument. In case of error during execution no error is returned.
-func ParseSelectStmt(stmt *ast.SelectStmt, fm *FuncMetadata) {
+func parseSelectStmt(stmt *ast.SelectStmt, fm *FuncMetadata) {
 	// Saves a local copy of the current id, all the branch will fork from it
 	currentAutomataId := fm.ScopeAutomata.GetLastId()
 	// The id of the state in which all the nested scopes will be merged, will converge
@@ -107,7 +107,7 @@ func ParseSelectStmt(stmt *ast.SelectStmt, fm *FuncMetadata) {
 // Specific function to extrapolate channel metadata from a DeclStmt statement
 // At the moment of writing this should always be possible since only GenDecl
 // satisfy the Decl interface however this may change in future releases of Go
-func ParseDeclStmt(stmt *ast.DeclStmt, fm *FuncMetadata) {
+func parseDeclStmt(stmt *ast.DeclStmt, fm *FuncMetadata) {
 	// Tries to cast the current statement's declaration to a GenDecl.
 	genDecl, isGenDecl := stmt.Decl.(*ast.GenDecl)
 
@@ -115,14 +115,14 @@ func ParseDeclStmt(stmt *ast.DeclStmt, fm *FuncMetadata) {
 		log.Fatalf("Couldn't get the GenDecl statement fron the DeclStmt at line %d\n", stmt.Pos())
 	}
 
-	chanMeta := ParseGenDecl(genDecl)
+	chanMeta := parseGenDecl(genDecl)
 	fm.addChannels(chanMeta...)
 }
 
 // This function tries to extract metadata about a channel from the GenDecl subtree
 // since is possible to declare more than value the function returns a slice of ChanMetadata
 // If errors are encountered at any point the function returns nil
-func ParseGenDecl(genDecl *ast.GenDecl) []ChanMetadata {
+func parseGenDecl(genDecl *ast.GenDecl) []ChanMetadata {
 	// A Slice containing all the metadata retrieved about the channel declared
 	bufferMetadata := []ChanMetadata{}
 

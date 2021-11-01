@@ -5,7 +5,7 @@
 
 // The only method avaiable from the outside is ParseForStmt and ParseRangeStmt which will add to the
 // given FileMetadata argument the data collected from the parsing of the respective constructs
-package parser
+package meta
 
 import (
 	"go/ast"
@@ -18,7 +18,7 @@ import (
 
 // This function parses a ForStmt statement and saves the Transition(s) data extracted
 // in the given FuncMetadata argument. In case of error during execution no error is returned.
-func ParseForStmt(stmt *ast.ForStmt, fm *FuncMetadata) {
+func parseForStmt(stmt *ast.ForStmt, fm *FuncMetadata) {
 	// Parse the init statement at first and the condition (always executed at least one time)
 	ast.Walk(fm, stmt.Init)
 	ast.Walk(fm, stmt.Cond) // ? parse BinaryExpr to find transition inside
@@ -46,7 +46,7 @@ func ParseForStmt(stmt *ast.ForStmt, fm *FuncMetadata) {
 // In case of error during execution no error is returned. If the identifier on which we're iterating
 // is a channel then the range function behaves as a for loop in which we're receiving from the channel
 // before each iteration, else (if we're iterating on a map or list) an eps-transition is used instead
-func ParseRangeStmt(stmt *ast.RangeStmt, fm *FuncMetadata) {
+func parseRangeStmt(stmt *ast.RangeStmt, fm *FuncMetadata) {
 	// Parse the init statement at first and the condition (always executed at least one time)
 	iterateeIdent, isIdent := stmt.X.(*ast.Ident)
 	// Flag to set if the iteratee is a local channel identifier

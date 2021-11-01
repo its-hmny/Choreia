@@ -6,7 +6,7 @@
 // The only method avaiable from the outside is ParseGenDecl, ParseDeclStmt, ParseSendStmt,
 // ParseRecvStmt and ParseSelectStmt which will add to the given FileMetadata argument the
 // data collected from the parsing phases
-package parser
+package meta
 
 import (
 	"fmt"
@@ -20,7 +20,7 @@ import (
 
 // This function parses a IfStmt statement and saves the data extracted in a FuncMetadata struct.
 // In case of error during execution a zero value of abovesaid struct is returned (no error returned).
-func ParseIfStmt(stmt *ast.IfStmt, fm *FuncMetadata) {
+func parseIfStmt(stmt *ast.IfStmt, fm *FuncMetadata) {
 	// First parses the init statement that is always executed before branching
 	ast.Walk(fm, stmt.Init)
 
@@ -55,7 +55,7 @@ func ParseIfStmt(stmt *ast.IfStmt, fm *FuncMetadata) {
 
 // This function parses a SwitchStmt statement and saves the data extracted in a FuncMetadata struct.
 // In case of error during execution a zero value of abovesaid struct is returned (no error returned).
-func ParseSwitchStmt(stmt *ast.SwitchStmt, fm *FuncMetadata) {
+func parseSwitchStmt(stmt *ast.SwitchStmt, fm *FuncMetadata) {
 	// First parses the init and tag sections, that are always executed before branching
 	ast.Walk(fm, stmt.Init)
 	ast.Walk(fm, stmt.Tag)
@@ -99,7 +99,7 @@ func ParseSwitchStmt(stmt *ast.SwitchStmt, fm *FuncMetadata) {
 
 // This function parses a TypeSwitchStmt statement and saves the data extracted in a FuncMetadata struct.
 // In case of error during execution a zero value of abovesaid struct is returned (no error returned).
-func ParseTypeSwitchStmt(stmt *ast.TypeSwitchStmt, fm *FuncMetadata) {
+func parseTypeSwitchStmt(stmt *ast.TypeSwitchStmt, fm *FuncMetadata) {
 	// First parses the init and tag sections, that are always executed before branching
 	ast.Walk(fm, stmt.Init)
 	ast.Walk(fm, stmt.Assign)
