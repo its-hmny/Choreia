@@ -6,102 +6,65 @@
 package main // TODO refactor
 
 import (
-	"encoding/json"
 	"fmt"
-	"go/ast"
-	"go/parser"
-	"go/token"
 	"log"
-	"os"
-	"strings"
 
 	"github.com/pborman/getopt/v2"
 
+	// Choreia internal metatdata extraction module
+	"github.com/its-hmny/Choreia/internal/meta"
 	// Choreia internal module for CDA handling
 	"github.com/its-hmny/Choreia/internal/automata"
-	// Choreia internal parser module
-	chr_parser "github.com/its-hmny/Choreia/internal/parser"
 )
 
-// ! Only for debugging pourposes will be removed later
-type debugVisitor int
-
-// ! Only for debugging pourposes will be removed later
-func (ip debugVisitor) Visit(node ast.Node) ast.Visitor {
-	if node == nil {
-		return nil
-	}
-	fmt.Printf("%s %T\n", strings.Repeat("  ", int(ip)), node)
-	return ip + 1
-}
-
 func main() {
-	// Logger setup
-	log.SetPrefix("[Choreia]: ")
-	log.SetFlags(0)
-
 	// Getopt setup for CLI argument parsing
 	inputFile := getopt.StringLong("input", 'i', "", "The .go file from which extract the Choreography Automata")
-	traceFlags := getopt.BoolLong("trace", 't', "Pretty prints on the console the AST", "false")
+	traceFlag := getopt.BoolLong("trace", 't', "Pretty prints on the console the AST", "false")
+	extTraceFlag := getopt.BoolLong("ext-trace", 'e', "Pretty prints on the console the expanded AST", "false")
 	getopt.BoolLong("help", 'h', "Display this help message", "false")
+	getopt.Parse() // Parses the program arguments
 
-	// Parse the program arguments
-	getopt.Parse()
+	// Logger setup
+	log.SetPrefix("[Choreia] ")
+	log.SetFlags(log.Ltime | log.Lshortfile)
 
 	if inputFile == nil && *inputFile == "" { // Checks for the existence of input file
 		getopt.Usage()
 		return
-	} else if fStat, err := os.Stat(*inputFile); os.IsNotExist(err) || fStat.IsDir() {
-		// Checks that the given input path actually exists
-		log.Fatal("A path to an existing go source file is neeeded")
 	}
 
-	// Positions are relative to fset
-	fset := token.NewFileSet()
+	// ! Debug trace, will be removed
+	fmt.Println("\t\t---------------------- PARSER DEBUG PRINT ----------------------")
 
-	// Parser mode flags, we want all every error possible
-	flags := parser.DeclarationErrors | parser.AllErrors
-	// And optionally a trace printed on the stdout
-	if traceFlags != nil && *traceFlags {
-		flags |= parser.Trace
+	// Default level for trace option while parsing the file
+	traceOpts := meta.NoTrace
+	// If the extended mode is enabled, it overrides the basic mode
+	if traceFlag != nil && *traceFlag {
+		traceOpts = meta.BasicTrace
+	} else if extTraceFlag != nil && *extTraceFlag {
+		traceOpts = meta.ExtendedTrace
 	}
 
-	// Parses the file and retrieves the AST
-	f, err := parser.ParseFile(fset, *inputFile, nil, flags)
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
+	// Parses and esxtracts the metadata from the given file
+	fileMetadata := meta.ExtractMetadata(*inputFile, traceOpts)
 
-	// ! Debug Visitor to print to terminal in a more human readable manner the AST
-	var debug debugVisitor
-	ast.Walk(debug, f)
+	// ! From here on is all a work in progress
+	fmt.Println("\t\t------------------------- CDA DEBUG PRINT -------------------------")
 
-	fmt.Println(`
-		    ------------------------ PARSER DEBUG PRINT ------------------------
-	`)
-	// Extracts the metadata about the given Go file and writes it to a JSON metadata file
-	fileMetadata := chr_parser.ParseAstFile(f)
-
-	// ! For debugging pourposes, to be removed
-	fileMetadata.FunctionMeta["main"].ScopeAutomata.ExportAsSVG("debug/prev.svg")
-
-	fmt.Println(`
-		--------------------------- CDA DEBUG PRINT ---------------------------
-	`)
 	// Uses the metadata to generate a Deterministic Choreography Automata (DCA)
 	automata.GenerateDCA(fileMetadata)
 
-	// ! Temporary, will be removed later
-	fileDump, fileErr := os.Create("debug/file_meta.json")
-	jsonDump, jsonErr := json.MarshalIndent(fileMetadata, "", "  ")
-	if jsonErr != nil || fileErr != nil {
-		log.Fatal("Error encountered while writing JSON metadata file")
-	}
-	fileDump.WriteString(string(jsonDump))
+	// // ! Debugging export as SVG of the graphs
+	// for name, meta := range fileMetadata.FunctionMeta {
+	// meta.ScopeAutomata.ExportAsSVG(fmt.Sprintf("debug/%s.svg", name))
+	// }
 
-	// ! Debugging export as png of the graphs
-	for name, meta := range fileMetadata.FunctionMeta {
-		meta.ScopeAutomata.ExportAsSVG(fmt.Sprintf("debug/%s.svg", name))
-	}
+	//  //  ! Debugging export of the metadata as SVG
+	// fileDump, fileErr := os.Create("debug/file_meta.json")
+	// jsonDump, jsonErr := json.MarshalIndent(fileMetadata, "", "  ")
+	// if jsonErr != nil || fileErr != nil {
+	// log.Fatal("Error encountered while writing JSON metadata file")
+	// }
+	// fileDump.WriteString(string(jsonDump))
 }
