@@ -2,31 +2,34 @@
 
 // This package handles the extraction of Partial Nondeterministic Automatas from
 // metadata extracted and the handling and subsequent transformation of abovesaid
-// NCA until a single Deterministic Choreography Automata is obtained by them
+// NDCA until a single Deterministic Choreography Automata is obtained by them
 
-// This module defines some helper function to transform and work with NCAs
-// (Nondeterministic Choreography Automatas). Such transformations could be extracting
-// the NCAs from given metadata or removing Eps transition from them (making them DCAs)
+// This module defines some helper function to transform and work with NDCAs
+// (Non-Deterministic Choreography Automatas). Such transformations could be extracting
+// the NDCAs from given metadata or removing Eps transition from them (making them DCAs)
 package automata
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/its-hmny/Choreia/internal/meta"
 	"github.com/its-hmny/Choreia/internal/types/fsa"
 )
 
-// This function extracts from the given function metadata a Partial Nondeterministic CA that
-// represents the execution flow of that GoRoutine. When a Spawn transaction is encountered the
-// function call itself recursively generating more Partial NCAs for the spawned GoRoutine.
+// This function extracts from the given function metadata a Projection NDCA that
+// represents the execution flow of a GoRoutine. When a Spawn transaction is encountered the
+// function call itself recursively generating more Projection NDCAs for the spawned GoRoutine.
 // NOTE: This function should be called with the metadata of a function that is the entrypoint of one
 // or more GoRoutine (the function called on a the spawned routine).
-func extractPartialNCAs(funcMeta meta.FuncMetadata, fileMeta meta.FileMetadata) []ChoregoraphyAutomata {
-	// List of Partial/Projection NCA extracted from the current recurive call
-	localCopy := *funcMeta.ScopeAutomata // TODO Add deep copy of SccopeAutoamata
-	extractedNCAs := []ChoregoraphyAutomata{&localCopy}
+func extractProjectionNDCAs(funcMeta meta.FuncMetadata, fileMeta meta.FileMetadata) []*fsa.FSA {
+	// Makes a full indipendent copy of the ScopeAutomata
+	localCopy := funcMeta.ScopeAutomata.Copy()
+	// List of Projection NDCA extracted from the current recurive call
+	extractedNDCAs := []*fsa.FSA{localCopy}
 
-	// ! refactor this code
+	// ! Debug print, will be removed
+	fmt.Printf("Local copy of '%s' ScopeAutomata at %p, other at %p\n", funcMeta.Name, localCopy, funcMeta.ScopeAutomata)
 
 	// Executes a function on each Transition (edge) of the Graph
 	for _, state := range localCopy.StateIterator() {
@@ -42,9 +45,9 @@ func extractPartialNCAs(funcMeta meta.FuncMetadata, fileMeta meta.FileMetadata) 
 			} else if t.Move == fsa.Spawn {
 				calledFuncMeta, hasMeta := fileMeta.FunctionMeta[t.Label]
 				if hasMeta {
-					// Recurively call extractPartialNCAs on the spawned GoRoutine entrypoint (the function
-					// scalled with go keyword), then add the extracted NCAs to the current list
-					extractedNCAs = append(extractedNCAs, extractPartialNCAs(calledFuncMeta, fileMeta)...)
+					// Recurively call extractProjectionNDCAs on the spawned GoRoutine entrypoint (the function
+					// scalled with go keyword), then add the extracted NDCAs to the current list
+					extractedNDCAs = append(extractedNDCAs, extractProjectionNDCAs(calledFuncMeta, fileMeta)...)
 				} else { // Transforms the transition in an eps-transition (that later will be removed)
 					log.Fatalf("Couldn't find function %s spawned as Go Routine\n", t.Label)
 				}
@@ -52,10 +55,10 @@ func extractPartialNCAs(funcMeta meta.FuncMetadata, fileMeta meta.FileMetadata) 
 		}
 	}
 
-	return extractedNCAs
+	return extractedNDCAs
 }
 
 // TODO implement
-func removeEpsTransitions(NCA ChoregoraphyAutomata) ChoregoraphyAutomata {
-	return nil
+func removeEpsTransitions(NDCA *fsa.FSA) fsa.FSA {
+	return fsa.FSA{}
 }

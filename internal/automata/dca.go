@@ -18,44 +18,35 @@ import (
 	"github.com/its-hmny/Choreia/internal/types/fsa"
 )
 
-// ----------------------------------------------------------------------------
-// ChoreographyAutomata
-
-// TODO add struct subsection comment
-//
-// TODO add struct subsection comment
-type ChoregoraphyAutomata *fsa.FSA
-
 // TODO comment
 // TODO comment
 // TODO comment
-func GenerateDCA(fileMeta meta.FileMetadata) ChoregoraphyAutomata {
+func GenerateDCA(fileMeta meta.FileMetadata) fsa.FSA {
 	mainFuncMeta, exist := fileMeta.FunctionMeta["main"]
 
 	if !exist {
 		log.Fatal("Cannot extract Partial Automata, 'main' function metadata not found")
 	}
 
-	// Extracts reursively from the metadata the Partial/Projection NCA, each one of them
+	// Extracts reursively from the metadata the Projection NDCA, each one of them
 	// will be a projection of the final one and will still have eps-transtion
-	partialNCAs := extractPartialNCAs(mainFuncMeta, fileMeta)
+	projectionNDCAs := extractProjectionNDCAs(mainFuncMeta, fileMeta)
+	projectionDCAs := make([]fsa.FSA, len(projectionNDCAs))
 
 	// ! Debug print, will be removed
-	fmt.Printf("Successfully extracted %d Projection NCAs\n", len(partialNCAs))
+	fmt.Printf("Successfully extracted %d Projection NCAs\n", len(projectionNDCAs))
 
-	// Removes eps-transition from each Partial NCA transforming them in
-	// equivalent DCA (but we're still working with Partial/Projection DCA)
-	partialDCAs := make([]ChoregoraphyAutomata, len(partialNCAs))
-	for i, NCA := range partialNCAs {
-		asGraph := fsa.FSA(*NCA)
-		asGraph.ExportAsSVG(fmt.Sprintf("debug/before-eps-removal-%d.svg", i))
+	// Removes eps-transition from each Projection NDCA transforming them in
+	// equivalent DCA (but we're still working with Projection DCA)
+	for i, NCA := range projectionNDCAs {
+		NCA.ExportAsSVG(fmt.Sprintf("debug/before-eps-removal-%d.svg", i))
 
-		partialDCAs[i] = removeEpsTransitions(NCA)
+		projectionDCAs[i] = removeEpsTransitions(NCA)
 	}
 
 	// Takes the deterministic version of the Partial Automatas and merges them
 	// in one DCA that will represent the choreography as a whole
 	// TODO IMPLEMENT
 
-	return nil
+	return fsa.FSA{}
 }
