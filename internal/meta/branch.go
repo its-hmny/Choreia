@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"go/ast"
 
-	"github.com/its-hmny/Choreia/internal/graph"
+	"github.com/its-hmny/Choreia/internal/types/fsa"
 )
 
 // ----------------------------------------------------------------------------
@@ -28,26 +28,26 @@ func parseIfStmt(stmt *ast.IfStmt, fm *FuncMetadata) {
 	branchingStateId := fm.ScopeAutomata.GetLastId()
 
 	// Generate an eps-transition to represent the creation of a new nested scope
-	tEpsIfStart := graph.Transition{Kind: graph.Eps, IdentName: "if-block-start"}
-	fm.ScopeAutomata.AddTransition(branchingStateId, graph.NewNode, tEpsIfStart)
+	tEpsIfStart := fsa.Transition{Move: fsa.Eps, Label: "if-block-start"}
+	fm.ScopeAutomata.AddTransition(branchingStateId, fsa.NewState, tEpsIfStart)
 	// Then parses both the condition and the nested scope (if-then)
 	ast.Walk(fm, stmt.Cond)
 	ast.Walk(fm, stmt.Body)
 	// Generates a transition to return/merge to the "main" scope
-	tEpsIfEnd := graph.Transition{Kind: graph.Eps, IdentName: "if-block-end"}
-	fm.ScopeAutomata.AddTransition(graph.Current, graph.NewNode, tEpsIfEnd)
+	tEpsIfEnd := fsa.Transition{Move: fsa.Eps, Label: "if-block-end"}
+	fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tEpsIfEnd)
 
 	// Saves the id of the latest created states (the one in which the 2+ scopes will be merged)
 	mergeStateId := fm.ScopeAutomata.GetLastId()
 
 	// If an else block is specified then its parsed on its own branch
-	tEpsElseStart := graph.Transition{Kind: graph.Eps, IdentName: "else-block-start"}
-	fm.ScopeAutomata.AddTransition(branchingStateId, graph.NewNode, tEpsElseStart)
+	tEpsElseStart := fsa.Transition{Move: fsa.Eps, Label: "else-block-start"}
+	fm.ScopeAutomata.AddTransition(branchingStateId, fsa.NewState, tEpsElseStart)
 	// Parses the else block
 	ast.Walk(fm, stmt.Else)
 	// Links the else-block-end to the same destination as the if-block-end
-	tEpsElseEnd := graph.Transition{Kind: graph.Eps, IdentName: "else-block-end"}
-	fm.ScopeAutomata.AddTransition(graph.Current, mergeStateId, tEpsElseEnd)
+	tEpsElseEnd := fsa.Transition{Move: fsa.Eps, Label: "else-block-end"}
+	fm.ScopeAutomata.AddTransition(fsa.Current, mergeStateId, tEpsElseEnd)
 
 	// Set the new root of the PartialAutomata, from which all future transition will start
 	fm.ScopeAutomata.SetRootId(mergeStateId)
@@ -64,7 +64,7 @@ func parseSwitchStmt(stmt *ast.SwitchStmt, fm *FuncMetadata) {
 	currentAutomataId := fm.ScopeAutomata.GetLastId()
 	// The id of the state in which all the nested scopes will be merged, will converge
 	// when -2 is to be considered uninitialized , will be initialized correctly on first iteration
-	mergeStateId := graph.NewNode
+	mergeStateId := fsa.NewState
 
 	for i, bodyStmt := range stmt.Body.List {
 		// Convert the bodyStmt to a CaseClause one, this is always possible at the moment
@@ -74,22 +74,22 @@ func parseSwitchStmt(stmt *ast.SwitchStmt, fm *FuncMetadata) {
 		// Generate an eps-transition to represent the fork/branch (the cases in the select)
 		// and add it as a transaction from the "branch point" saved before
 		startLabel := fmt.Sprintf("switch-case-%d-start", i)
-		tEpsStart := graph.Transition{Kind: graph.Eps, IdentName: startLabel}
-		fm.ScopeAutomata.AddTransition(currentAutomataId, graph.NewNode, tEpsStart)
+		tEpsStart := fsa.Transition{Move: fsa.Eps, Label: startLabel}
+		fm.ScopeAutomata.AddTransition(currentAutomataId, fsa.NewState, tEpsStart)
 
 		// Parses the clause (case stmt) before and then parses the nested block/scopes
 		ast.Walk(fm, caseClauseStmt)
 
 		// Generates a transition to return/merge to the "main" scope
 		endLabel := fmt.Sprintf("switch-case-%d-end", i)
-		tEpsEnd := graph.Transition{Kind: graph.Eps, IdentName: endLabel}
+		tEpsEnd := fsa.Transition{Move: fsa.Eps, Label: endLabel}
 
-		if mergeStateId == graph.NewNode {
+		if mergeStateId == fsa.NewState {
 			// Saves the id, of the merge state for use in next iterations
-			fm.ScopeAutomata.AddTransition(graph.Current, graph.NewNode, tEpsEnd)
+			fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tEpsEnd)
 			mergeStateId = fm.ScopeAutomata.GetLastId()
 		} else {
-			fm.ScopeAutomata.AddTransition(graph.Current, mergeStateId, tEpsEnd)
+			fm.ScopeAutomata.AddTransition(fsa.Current, mergeStateId, tEpsEnd)
 		}
 	}
 
@@ -108,7 +108,7 @@ func parseTypeSwitchStmt(stmt *ast.TypeSwitchStmt, fm *FuncMetadata) {
 	currentAutomataId := fm.ScopeAutomata.GetLastId()
 	// The id of the state in which all the nested scopes will be merged, will converge
 	// when -2 is to be considered uninitialized , will be initialized correctly on first iteration
-	mergeStateId := graph.NewNode
+	mergeStateId := fsa.NewState
 
 	for i, bodyStmt := range stmt.Body.List {
 		// Convert the bodyStmt to a CaseClause one, this is always possible at the moment
@@ -118,22 +118,22 @@ func parseTypeSwitchStmt(stmt *ast.TypeSwitchStmt, fm *FuncMetadata) {
 		// Generate an eps-transition to represent the fork/branch (the cases in the select)
 		// and add it as a transaction from the "branch point" saved before
 		startLabel := fmt.Sprintf("typeswitch-case-%d-start", i)
-		tEpsStart := graph.Transition{Kind: graph.Eps, IdentName: startLabel}
-		fm.ScopeAutomata.AddTransition(currentAutomataId, graph.NewNode, tEpsStart)
+		tEpsStart := fsa.Transition{Move: fsa.Eps, Label: startLabel}
+		fm.ScopeAutomata.AddTransition(currentAutomataId, fsa.NewState, tEpsStart)
 
 		// Parses the clause (case stmt) before and then parses the nested block/scopes
 		ast.Walk(fm, caseClauseStmt)
 
 		// Generates a transition to return/merge to the "main" scope
 		endLabel := fmt.Sprintf("typeswitch-case-%d-end", i)
-		tEpsEnd := graph.Transition{Kind: graph.Eps, IdentName: endLabel}
+		tEpsEnd := fsa.Transition{Move: fsa.Eps, Label: endLabel}
 
-		if mergeStateId == graph.NewNode {
+		if mergeStateId == fsa.NewState {
 			// Saves the id, of the merge state for use in next iterations
-			fm.ScopeAutomata.AddTransition(graph.Current, graph.NewNode, tEpsEnd)
+			fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tEpsEnd)
 			mergeStateId = fm.ScopeAutomata.GetLastId()
 		} else {
-			fm.ScopeAutomata.AddTransition(graph.Current, mergeStateId, tEpsEnd)
+			fm.ScopeAutomata.AddTransition(fsa.Current, mergeStateId, tEpsEnd)
 		}
 	}
 

@@ -12,8 +12,8 @@ package automata
 import (
 	"log"
 
-	"github.com/its-hmny/Choreia/internal/graph"
 	"github.com/its-hmny/Choreia/internal/meta"
+	"github.com/its-hmny/Choreia/internal/types/fsa"
 )
 
 // This function extracts from the given function metadata a Partial Nondeterministic CA that
@@ -26,27 +26,31 @@ func extractPartialNCAs(funcMeta meta.FuncMetadata, fileMeta meta.FileMetadata) 
 	localCopy := *funcMeta.ScopeAutomata // TODO Add deep copy of SccopeAutoamata
 	extractedNCAs := []ChoregoraphyAutomata{&localCopy}
 
+	// ! refactor this code
+
 	// Executes a function on each Transition (edge) of the Graph
-	localCopy.ForEachTransition(func(from, to int, t *graph.Transition) {
-		if t.Kind == graph.Call {
-			calleeMeta, hasMeta := fileMeta.FunctionMeta[t.IdentName]
-			if hasMeta { // Expands in place the ScopeAutomata of the called function
-				localCopy.ExpandInPlace(from, to, *calleeMeta.ScopeAutomata)
-			} else { // Transforms the transition in an eps-transition (that later will be removed)
-				newT := graph.Transition{Kind: graph.Eps, IdentName: "unknown-fuction-call"}
-				localCopy.AddTransition(from, to, newT) // Overwrites the current one
-			}
-		} else if t.Kind == graph.Spawn {
-			calledFuncMeta, hasMeta := fileMeta.FunctionMeta[t.IdentName]
-			if hasMeta {
-				// Recurively call extractPartialNCAs on the spawned GoRoutine entrypoint (the function
-				// scalled with go keyword), then add the extracted NCAs to the current list
-				extractedNCAs = append(extractedNCAs, extractPartialNCAs(calledFuncMeta, fileMeta)...)
-			} else { // Transforms the transition in an eps-transition (that later will be removed)
-				log.Fatalf("Couldn't find function %s spawned as Go Routine\n", t.IdentName)
+	for _, state := range localCopy.StateIterator() {
+		for to, t := range state.TransitionIterator() {
+			if t.Move == fsa.Call {
+				calleeMeta, hasMeta := fileMeta.FunctionMeta[t.Label]
+				if hasMeta { // Expands in place the ScopeAutomata of the called function
+					localCopy.ExpandInPlace(state.Id, to, *calleeMeta.ScopeAutomata)
+				} else { // Transforms the transition in an eps-transition (that later will be removed)
+					newT := fsa.Transition{Move: fsa.Eps, Label: "unknown-fuction-call"}
+					localCopy.AddTransition(state.Id, to, newT) // Overwrites the current one
+				}
+			} else if t.Move == fsa.Spawn {
+				calledFuncMeta, hasMeta := fileMeta.FunctionMeta[t.Label]
+				if hasMeta {
+					// Recurively call extractPartialNCAs on the spawned GoRoutine entrypoint (the function
+					// scalled with go keyword), then add the extracted NCAs to the current list
+					extractedNCAs = append(extractedNCAs, extractPartialNCAs(calledFuncMeta, fileMeta)...)
+				} else { // Transforms the transition in an eps-transition (that later will be removed)
+					log.Fatalf("Couldn't find function %s spawned as Go Routine\n", t.Label)
+				}
 			}
 		}
-	})
+	}
 
 	return extractedNCAs
 }

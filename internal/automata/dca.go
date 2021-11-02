@@ -14,8 +14,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/its-hmny/Choreia/internal/graph"
 	"github.com/its-hmny/Choreia/internal/meta"
+	"github.com/its-hmny/Choreia/internal/types/fsa"
 )
 
 // ----------------------------------------------------------------------------
@@ -24,7 +24,7 @@ import (
 // TODO add struct subsection comment
 //
 // TODO add struct subsection comment
-type ChoregoraphyAutomata *graph.TransitionGraph
+type ChoregoraphyAutomata *fsa.FSA
 
 // TODO comment
 // TODO comment
@@ -39,7 +39,6 @@ func GenerateDCA(fileMeta meta.FileMetadata) ChoregoraphyAutomata {
 	// Extracts reursively from the metadata the Partial/Projection NCA, each one of them
 	// will be a projection of the final one and will still have eps-transtion
 	partialNCAs := extractPartialNCAs(mainFuncMeta, fileMeta)
-	partialNCAs[2].Nodes[0].Id = -12
 
 	// ! Debug print, will be removed
 	fmt.Printf("Successfully extracted %d Projection NCAs\n", len(partialNCAs))
@@ -48,7 +47,7 @@ func GenerateDCA(fileMeta meta.FileMetadata) ChoregoraphyAutomata {
 	// equivalent DCA (but we're still working with Partial/Projection DCA)
 	partialDCAs := make([]ChoregoraphyAutomata, len(partialNCAs))
 	for i, NCA := range partialNCAs {
-		asGraph := graph.TransitionGraph(*NCA)
+		asGraph := fsa.FSA(*NCA)
 		asGraph.ExportAsSVG(fmt.Sprintf("debug/before-eps-removal-%d.svg", i))
 
 		partialDCAs[i] = removeEpsTransitions(NCA)
