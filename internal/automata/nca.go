@@ -10,8 +10,10 @@
 package automata
 
 import (
+	"log"
+
 	"github.com/its-hmny/Choreia/internal/graph"
-	meta "github.com/its-hmny/Choreia/internal/parser"
+	"github.com/its-hmny/Choreia/internal/meta"
 )
 
 // This function extracts from the given function metadata a Partial Nondeterministic CA that
@@ -21,16 +23,18 @@ import (
 // or more GoRoutine (the function called on a the spawned routine).
 func extractPartialNCAs(funcMeta meta.FuncMetadata, fileMeta meta.FileMetadata) []ChoregoraphyAutomata {
 	// List of Partial/Projection NCA extracted from the current recurive call
-	extractedNCAs := []ChoregoraphyAutomata{funcMeta.ScopeAutomata}
+	localCopy := *funcMeta.ScopeAutomata // TODO Add deep copy of SccopeAutoamata
+	extractedNCAs := []ChoregoraphyAutomata{&localCopy}
 
 	// Executes a function on each Transition (edge) of the Graph
-	funcMeta.ScopeAutomata.ForEachTransition(func(from, to int, t *graph.Transition) {
+	localCopy.ForEachTransition(func(from, to int, t *graph.Transition) {
 		if t.Kind == graph.Call {
 			calleeMeta, hasMeta := fileMeta.FunctionMeta[t.IdentName]
 			if hasMeta { // Expands in place the ScopeAutomata of the called function
-				funcMeta.ScopeAutomata.ExpandInPlace(from, to, *calleeMeta.ScopeAutomata)
+				localCopy.ExpandInPlace(from, to, *calleeMeta.ScopeAutomata)
 			} else { // Transforms the transition in an eps-transition (that later will be removed)
-				t.Kind, t.IdentName = graph.Eps, "unknown-fuction-call"
+				newT := graph.Transition{Kind: graph.Eps, IdentName: "unknown-fuction-call"}
+				localCopy.AddTransition(from, to, newT) // Overwrites the current one
 			}
 		} else if t.Kind == graph.Spawn {
 			calledFuncMeta, hasMeta := fileMeta.FunctionMeta[t.IdentName]
@@ -39,7 +43,7 @@ func extractPartialNCAs(funcMeta meta.FuncMetadata, fileMeta meta.FileMetadata) 
 				// scalled with go keyword), then add the extracted NCAs to the current list
 				extractedNCAs = append(extractedNCAs, extractPartialNCAs(calledFuncMeta, fileMeta)...)
 			} else { // Transforms the transition in an eps-transition (that later will be removed)
-				t.Kind, t.IdentName = graph.Eps, "unknown-fuction-spawn"
+				log.Fatalf("Couldn't find function %s spawned as Go Routine\n", t.IdentName)
 			}
 		}
 	})

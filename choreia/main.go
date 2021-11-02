@@ -34,7 +34,7 @@ func main() {
 		return
 	}
 
-	// ! Debug trace, will be removed
+	// ! Debug print, will be removed
 	fmt.Println("\t\t---------------------- PARSER DEBUG PRINT ----------------------")
 
 	// Default level for trace option while parsing the file
