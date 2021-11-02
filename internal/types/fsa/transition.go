@@ -1,9 +1,9 @@
 // Copyright Enea Guidi (hmny).
 
-// TODO COMMENT
-// TODO COMMENT
+// This package implements a Finite State Automata (FSA) data structure and its own API.
+// For this specific use cases the implementation is quite simple & basic
 
-// TODO COMMENT
+// The only struct avaiable from the outside is Transition and its own API adn related enum
 package fsa
 
 import "fmt"
@@ -29,7 +29,7 @@ type MoveKind string
 // simple explanation on the transition itself and a optional generic payload container
 type Transition struct {
 	Move    MoveKind    // The MoveType of Transition (Call, Eps, Recv, Send, Spawn)
-	Label   string      // An explicative label of the action that is being executed (e.g. the ident of the channel)
+	Label   string      // An explicative label of the action that is being executed
 	Payload interface{} // A generic payload container for further info memorization
 }
 

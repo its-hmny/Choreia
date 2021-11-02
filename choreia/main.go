@@ -3,7 +3,7 @@
 // This package contains the entry point of the whole program, it handles
 // directly all the interaction with its utility module with the final pourpose
 // of extracting a Choreography Automata from the given input file
-package main // TODO refactor
+package main
 
 import (
 	"fmt"

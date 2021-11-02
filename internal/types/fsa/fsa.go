@@ -1,6 +1,6 @@
 // Copyright Enea Guidi (hmny).
 
-// This package implements a Graph data structure and its own API.
+// This package implements a Finite State Automata (FSA) data structure and its own API.
 // For this specific use cases the implementation is quite simple & basic
 
 // The only method avaiable from the outside are Transitiongraph and its API
@@ -30,7 +30,7 @@ const (
 // A struct containing a basic graph implementation that keeps track of the transaction that occur
 // subsequently during the execution flow of a function (or scope).
 type FSA struct {
-	currentId int     // The id of the state from which the new transition (or edge) will start when an id is not specified
+	currentId int     // The last id generated, the id of the last node
 	states    []State // The list of state inside the graph
 }
 
@@ -39,7 +39,7 @@ type State struct {
 	transition map[int]Transition // A map to other stateId the Transition data
 }
 
-// This function generates a new TransitionGraph and returns a pointer reference to it
+// This function generates a new FSA and returns a pointer reference to it
 func NewFSA() *FSA {
 	return &FSA{
 		currentId: 0,
@@ -50,22 +50,43 @@ func NewFSA() *FSA {
 	}
 }
 
+// This function generates an indipendet copy of the given FSA and returns it
+func (original *FSA) Copy() *FSA {
+	copy := FSA{
+		currentId: original.currentId,
+		states:    make([]State, 0, len(original.states)),
+	}
+
+	for _, currenState := range original.states {
+		// Creates a new map, overriding the copied one (since map instance remains intertwined)
+		currenState.transition = make(map[int]Transition)
+		// Copies all the entry of the other map into the decoupled one
+		for dest, t := range original.states[currenState.Id].transition {
+			currenState.transition[dest] = t
+		}
+		// Then adds the fully copied state to the copy FSA
+		copy.states = append(copy.states, currenState)
+	}
+
+	return &copy
+}
+
 // Returns the latest generated id
-func (g *FSA) GetLastId() int {
-	return len(g.states) - 1
+func (fsa *FSA) GetLastId() int {
+	return len(fsa.states) - 1
 }
 
 // Set a new rootId, a rootId is the id of the State (state) from which all future transition
 // will start when an id isn't specified, this is used since when merging multiple subgraph is
 // needed that the merge state will become the one from which create new transition even if it
 // is not the last created state
-func (g *FSA) SetRootId(newRootId int) {
-	g.currentId = newRootId
+func (fsa *FSA) SetRootId(newRootId int) {
+	fsa.currentId = newRootId
 }
 
 // Returns the id of the final state, if such state is not present returns Unknown
-func (g *FSA) GetFinalStateId() int {
-	for _, currentState := range g.states {
+func (fsa *FSA) GetFinalStateId() int {
+	for _, currentState := range fsa.states {
 		// The final state is the one for which there aren't any outcoming transitions
 		if len(currentState.transition) == 0 {
 			return currentState.Id
@@ -77,9 +98,9 @@ func (g *FSA) GetFinalStateId() int {
 
 // This function adds a new State to the TransitionGraph generating its
 // id incrementally with respects to the previusly existent state
-func (g *FSA) newState() (id int) {
-	id = len(g.states) // Generates a new id
-	g.states = append(g.states, State{
+func (fsa *FSA) newState() (id int) {
+	id = len(fsa.states) // Generates a new id
+	fsa.states = append(fsa.states, State{
 		Id:         id,
 		transition: make(map[int]Transition),
 	})
@@ -91,7 +112,7 @@ func (g *FSA) newState() (id int) {
 // for "from" that connect the new state to the latest or newStates for "to"
 // that automatically instantiate a new state as destination of the transition
 // NOTE: If a transition already exist then is overwritten
-func (g *FSA) AddTransition(from, to int, t Transition) {
+func (fsa *FSA) AddTransition(from, to int, t Transition) {
 	// Input checking
 	if from == Unknown || to == Unknown {
 		log.Fatal("unknown starting or ending state on AddTransition")
@@ -102,31 +123,31 @@ func (g *FSA) AddTransition(from, to int, t Transition) {
 	// The user can omit a specific starting state, in this case the
 	// latest added state id is used as starting point of the transition
 	if from == Current {
-		from = g.currentId
+		from = fsa.currentId
 	}
 
 	// The user can omit the ending state of the new transition, in this
 	// case a new state is created and the transition is linked to that one
 	if to == NewState {
-		to = g.newState()
-		g.SetRootId(to)
+		to = fsa.newState()
+		fsa.SetRootId(to)
 	}
 
 	// ! Debug print, will be removed later
 	fmt.Printf("BP__ %d -> %d \t %+v\n", from, to, t)
 
 	// Creates/assign the new transition
-	g.states[from].transition[to] = t
+	fsa.states[from].transition[to] = t
 }
 
 // This function expands a graph in place of an transition. Since in our case every
 // Automata/Graph has only one initial and final state then we simply copy the other graph
 // state by state and transition by transition and then we link the copy to the "from" and "to" states
-func (g *FSA) ExpandInPlace(from, to int, other FSA) {
+func (fsa *FSA) ExpandInPlace(from, to int, other FSA) {
 	// First of all remove the old call transition (since it will be expanded)
-	delete(g.states[from].transition, to)
+	delete(fsa.states[from].transition, to)
 	// Calculate the offset from which the ids of the "other" will be padded with
-	offset := len(g.states)
+	offset := len(fsa.states)
 
 	// Copies the "other" graph state, applying the offset to each id
 	for _, cpState := range other.states {
@@ -138,7 +159,7 @@ func (g *FSA) ExpandInPlace(from, to int, other FSA) {
 		}
 		// Then creates a new state and adds it to the destination graph
 		newState := State{Id: offset + cpState.Id, transition: newStateTrans}
-		g.states = append(g.states, newState)
+		fsa.states = append(fsa.states, newState)
 	}
 
 	// Eps transition to mark/link the start of the expanded/copied graph
@@ -147,8 +168,8 @@ func (g *FSA) ExpandInPlace(from, to int, other FSA) {
 	// Initial and final state of the freshly copied graph
 	copyInitialStateId, copyFinalStateId := offset, other.GetFinalStateId()+offset
 	// The "linking" transition are now added to the graph, completing the expansion
-	g.AddTransition(from, copyInitialStateId, tExpansionStart)
-	g.AddTransition(copyFinalStateId, to, tExpansionEnd)
+	fsa.AddTransition(from, copyInitialStateId, tExpansionStart)
+	fsa.AddTransition(copyFinalStateId, to, tExpansionEnd)
 }
 
 // Returns an iterable representation of the outcoming transition for the given State
@@ -157,14 +178,14 @@ func (s *State) TransitionIterator() map[int]Transition {
 }
 
 // Returns an iterable representation of the states for the given Graph
-func (g *FSA) StateIterator() []State {
-	return g.states
+func (fsa *FSA) StateIterator() []State {
+	return fsa.states
 }
 
 // This function exports a .png image of the current state of the Graph, it copies state by state
 // and then transition by transition the graph upon which is called, and then saves the GraphViz copy as
 // a .png image file to the provided path
-func (graph *FSA) ExportAsSVG(imagePath string) {
+func (fsa *FSA) ExportAsSVG(imagePath string) {
 	// Creates a GraphViz instance and initializes a Graph instance
 	graphvizInstance := graphviz.New()
 	graphRender, err := graphvizInstance.Graph()
@@ -178,13 +199,13 @@ func (graph *FSA) ExportAsSVG(imagePath string) {
 	associationMap := make(map[int]*cgraph.Node)
 
 	// Bulk copy of TransitionGraph.states into renderGraph
-	for _, state := range graph.states {
+	for _, state := range fsa.states {
 		renderNode, _ := graphRender.CreateNode(fmt.Sprint(state.Id))
 		associationMap[state.Id] = renderNode
 	}
 
 	// Bulk copy of the FSA's Transition into renderGraph
-	for _, state := range graph.states {
+	for _, state := range fsa.states {
 		for destId, transition := range state.transition {
 			from := associationMap[state.Id]
 			to := associationMap[destId]
