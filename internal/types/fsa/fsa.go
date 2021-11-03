@@ -3,7 +3,7 @@
 // This package implements a Finite State Automata (FSA) data structure and its own API.
 // For this specific use cases the implementation is quite simple & basic
 
-// The only method avaiable from the outside are Transitiongraph and its API
+// The only method avaiable from the outside are FSA and its API
 package fsa
 
 import (
@@ -40,7 +40,7 @@ type State struct {
 }
 
 // This function generates a new FSA and returns a pointer reference to it
-func NewFSA() *FSA {
+func New() *FSA {
 	return &FSA{
 		currentId: 0,
 		states: []State{
@@ -94,6 +94,12 @@ func (fsa *FSA) GetFinalStateId() int {
 	}
 
 	return Unknown
+}
+
+// Returns the state identified by the given id,if not found returns error
+func (fsa *FSA) GetState(stateId int) State {
+	found := fsa.states[stateId]
+	return found
 }
 
 // This function adds a new State to the TransitionGraph generating its

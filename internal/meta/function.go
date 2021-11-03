@@ -143,7 +143,7 @@ func parseFuncDecl(stmt *ast.FuncDecl) FuncMetadata {
 		Name:          funcName,
 		ChanMeta:      make(map[string]ChanMetadata),
 		InlineArgs:    make(map[string]FuncArg),
-		ScopeAutomata: fsa.NewFSA(),
+		ScopeAutomata: fsa.New(),
 	}
 
 	// If the current is an external (non Go) function then is skipped since
