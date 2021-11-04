@@ -14,6 +14,7 @@ import (
 	"log"
 
 	"github.com/its-hmny/Choreia/internal/meta"
+	"github.com/its-hmny/Choreia/internal/types/closure"
 	"github.com/its-hmny/Choreia/internal/types/fsa"
 )
 
@@ -59,6 +60,72 @@ func extractProjectionNDCAs(funcMeta meta.FuncMetadata, fileMeta meta.FileMetada
 }
 
 // TODO implement
-func removeEpsTransitions(NDCA *fsa.FSA) fsa.FSA {
+func subsetConstructionAlgorithm(NDCA *fsa.FSA) fsa.FSA {
+	sigmaAlphabet := []fsa.MoveKind{fsa.Recv, fsa.Send, fsa.Spawn}
+	firstEpsClosure := getEpsClosure(NDCA, NDCA.GetState(0))
+	tSet := []*closure.Closure{firstEpsClosure}
+	nIteration := 0
+
+	for nIteration < len(tSet) {
+		closure := tSet[nIteration] // Extracts the closure to be evaluated
+
+		for _, possibleMove := range sigmaAlphabet {
+			reachedByMove := reachWithMove(possibleMove, closure, NDCA)
+			moveEpsClosure := getEpsClosure(NDCA, reachedByMove...)
+			moveEpsClosure.Id++
+			if !isContained(moveEpsClosure, tSet) {
+				tSet = append(tSet, moveEpsClosure)
+			}
+		}
+
+		nIteration++
+	}
+
 	return fsa.FSA{}
+}
+
+func getEpsClosure(NDCA *fsa.FSA, states ...fsa.State) *closure.Closure {
+	epsClosure := closure.New()
+
+	for _, state := range states {
+		epsClosure.Add(state) // A state always belong to its epsClosure
+
+		// For each state reachable with an eps transition from this one we calculate
+		// its own epsClosure and we merge the two together
+		for destId, transition := range state.TransitionIterator() {
+			// Skips non-eps transition or destination already included
+			if transition.Move != fsa.Eps || epsClosure.Exist(destId) {
+				continue
+			}
+			reachedState := NDCA.GetState(destId)
+			reachedEpsClosure := getEpsClosure(NDCA, reachedState)
+			epsClosure.Add(reachedEpsClosure.Iterator()...)
+		}
+	}
+
+	return epsClosure
+}
+
+func reachWithMove(move fsa.MoveKind, closureSet *closure.Closure, NDCA *fsa.FSA) []fsa.State {
+	stateList := []fsa.State{}
+
+	for _, state := range closureSet.Iterator() {
+		for destId, transition := range state.TransitionIterator() {
+			if transition.Move == move {
+				stateList = append(stateList, NDCA.GetState(destId))
+			}
+		}
+	}
+
+	return stateList
+}
+
+func isContained(item *closure.Closure, set []*closure.Closure) bool {
+	for _, element := range set {
+		if element.IsEqual(item) {
+			return true
+		}
+	}
+
+	return false
 }

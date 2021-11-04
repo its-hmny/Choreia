@@ -14,9 +14,12 @@ import (
 	"github.com/its-hmny/Choreia/internal/types/fsa"
 )
 
+var latestId int = 0
+
 // Closure is an implementation of a Set using the builtin map type.
 type Closure struct {
-	items map[int]fsa.State
+	Id    int               // The UID of the closure
+	items map[int]fsa.State // A map that defines wich element belong to the closure and which do not
 }
 
 // Add will add the provided items to the closure.
@@ -48,6 +51,21 @@ func (closure *Closure) Contains(items ...fsa.State) bool {
 func (closure *Closure) Exist(key int) bool {
 	_, exist := closure.items[key]
 	return exist
+}
+
+// IsEqual returns a bool indicating if the given closure is equal to the one provided.
+func (closure *Closure) IsEqual(other *Closure) bool {
+	if len(closure.items) != len(other.items) {
+		return false
+	}
+
+	// Checks element by element that each item in other is an item in closure as well
+	for _, otherElem := range other.Iterator() {
+		if _, exist := closure.items[otherElem.Id]; !exist {
+			return false // If an element isn't present then false is returned
+		}
+	}
+	return true
 }
 
 // Iteator will return a list of the fsa.State in the closure.
@@ -95,10 +113,12 @@ func (closure *Closure) ExportAsSVG(path string) {
 // New is the constructor for closures. It will pull from a reuseable memory pool if it can.
 // Takes a list of items to initialize the closure with.
 func New(items ...fsa.State) *Closure {
-	closure := Closure{items: make(map[int]fsa.State)}
+	closure := Closure{Id: latestId, items: make(map[int]fsa.State)}
+
 	for _, item := range items {
 		closure.items[item.Id] = item
 	}
 
+	latestId++
 	return &closure
 }

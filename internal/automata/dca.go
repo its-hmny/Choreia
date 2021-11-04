@@ -39,9 +39,11 @@ func GenerateDCA(fileMeta meta.FileMetadata) fsa.FSA {
 	// Removes eps-transition from each Projection NDCA transforming them in
 	// equivalent DCA (but we're still working with Projection DCA)
 	for i, NCA := range projectionNDCAs {
-		NCA.ExportAsSVG(fmt.Sprintf("debug/before-eps-removal-%d.svg", i))
+		if i == 0 { // ! Will be removed
+			NCA.ExportAsSVG(fmt.Sprintf("debug/before-eps-removal-%d.svg", i))
 
-		projectionDCAs[i] = removeEpsTransitions(NCA)
+			projectionDCAs[i] = subsetConstructionAlgorithm(NCA)
+		}
 	}
 
 	// Takes the deterministic version of the Partial Automatas and merges them

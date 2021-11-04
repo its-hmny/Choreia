@@ -40,12 +40,14 @@ func main() {
 	var channel = make(chan int)
 	boundedChan := make(chan string, 10)
 
+	sum(s, channel)
+
 	go sum(s, channel)
 	go sum(s[len(s)/2:], channel)
 
-	go func(x int) {
-		fmt.Println("Hello from anonymous function")
-	}(3)
+	// go func(x int) {
+	// fmt.Println("Hello from anonymous function")
+	// }(3)
 
 	boundedChan <- "Hello"
 	<-boundedChan
