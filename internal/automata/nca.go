@@ -68,6 +68,7 @@ func subsetConstructionAlgorithm(NDCA *fsa.FSA) fsa.FSA {
 
 	for nIteration < len(tSet) {
 		closure := tSet[nIteration] // Extracts the closure to be evaluated
+		closure.ExportAsSVG(fmt.Sprintf("debug/eps-closure-%d.svg", closure.Id))
 
 		for _, possibleMove := range sigmaAlphabet {
 			reachedByMove := reachWithMove(possibleMove, closure, NDCA)

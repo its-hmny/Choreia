@@ -203,11 +203,17 @@ func (fsa *FSA) ExportAsSVG(imagePath string) {
 	// Initializes a map that will map the TransitionGraph state's id to a cgraph.Node pointer
 	// (a copy of the state that will be rendered). This will be used to render the edges later on
 	associationMap := make(map[int]*cgraph.Node)
+	// Saves the id of the final state
+	finalStateId := fsa.GetFinalStateId()
 
 	// Bulk copy of TransitionGraph.states into renderGraph
 	for _, state := range fsa.states {
 		renderNode, _ := graphRender.CreateNode(fmt.Sprint(state.Id))
 		associationMap[state.Id] = renderNode
+		renderNode.SetShape(cgraph.CircleShape)
+		if finalStateId == state.Id {
+			renderNode.SetShape(cgraph.DoubleCircleShape)
+		}
 	}
 
 	// Bulk copy of the FSA's Transition into renderGraph

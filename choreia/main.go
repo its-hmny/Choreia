@@ -8,6 +8,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/pborman/getopt/v2"
 
@@ -33,6 +34,12 @@ func main() {
 		getopt.Usage()
 		return
 	}
+
+	// ! Debug, will be removed
+	if _, err := os.Stat("debug"); err == nil {
+		os.RemoveAll("debug")
+	}
+	os.Mkdir("debug", 0775)
 
 	// ! Debug print, will be removed
 	fmt.Println("\t\t---------------------- PARSER DEBUG PRINT ----------------------")
