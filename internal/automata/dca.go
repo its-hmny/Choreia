@@ -31,7 +31,7 @@ func GenerateDCA(fileMeta meta.FileMetadata) fsa.FSA {
 	// Extracts reursively from the metadata the Projection NDCA, each one of them
 	// will be a projection of the final one and will still have eps-transtion
 	projectionNDCAs := extractProjectionNDCAs(mainFuncMeta, fileMeta)
-	projectionDCAs := make([]fsa.FSA, len(projectionNDCAs))
+	projectionDCAs := make([]*fsa.FSA, len(projectionNDCAs))
 
 	// ! Debug print, will be removed
 	fmt.Printf("Successfully extracted %d Projection NCAs\n", len(projectionNDCAs))
@@ -43,6 +43,8 @@ func GenerateDCA(fileMeta meta.FileMetadata) fsa.FSA {
 			NCA.ExportAsSVG(fmt.Sprintf("debug/before-eps-removal-%d.svg", i))
 
 			projectionDCAs[i] = subsetConstructionAlgorithm(NCA)
+
+			projectionDCAs[i].ExportAsSVG(fmt.Sprintf("debug/after-eps-removal-%d.svg", i))
 		}
 	}
 

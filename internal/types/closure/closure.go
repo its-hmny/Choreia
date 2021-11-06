@@ -23,6 +23,11 @@ type Closure struct {
 }
 
 // Add will add the provided items to the closure.
+func (closure *Closure) IsEmpty() bool {
+	return len(closure.items) == 0
+}
+
+// Add will add the provided items to the closure.
 func (closure *Closure) Add(items ...fsa.State) {
 	for _, item := range items {
 		closure.items[item.Id] = item

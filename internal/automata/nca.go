@@ -60,12 +60,19 @@ func extractProjectionNDCAs(funcMeta meta.FuncMetadata, fileMeta meta.FileMetada
 }
 
 // TODO implement
-func subsetConstructionAlgorithm(NDCA *fsa.FSA) fsa.FSA {
+func subsetConstructionAlgorithm(NDCA *fsa.FSA) *fsa.FSA {
+	// Initialization of some basic fields
 	sigmaAlphabet := []fsa.MoveKind{fsa.Recv, fsa.Send, fsa.Spawn}
 	firstEpsClosure := getEpsClosure(NDCA, NDCA.GetState(0))
 	tSet := []*closure.Closure{firstEpsClosure}
+
+	DCA := fsa.New()           // The deterministic DCA
+	idMap := make(map[int]int) // To map the id of the closures to the FSA states
+
 	nIteration := 0
 
+	// This type of iteration is necessary since the "range" one will not work
+	// on a struct that changes inside a loop, some element are not guaranteed to be iterated
 	for nIteration < len(tSet) {
 		closure := tSet[nIteration] // Extracts the closure to be evaluated
 		closure.ExportAsSVG(fmt.Sprintf("debug/eps-closure-%d.svg", closure.Id))
@@ -73,16 +80,31 @@ func subsetConstructionAlgorithm(NDCA *fsa.FSA) fsa.FSA {
 		for _, possibleMove := range sigmaAlphabet {
 			reachedByMove := reachWithMove(possibleMove, closure, NDCA)
 			moveEpsClosure := getEpsClosure(NDCA, reachedByMove...)
-			moveEpsClosure.Id++
-			if !isContained(moveEpsClosure, tSet) {
+
+			// Ignores the error state, from which is not possible to escape
+			if moveEpsClosure.IsEmpty() {
+				continue
+			}
+
+			exist, twinId := isContained(moveEpsClosure, tSet)
+			transition := fsa.Transition{Move: possibleMove, Label: string(possibleMove)}
+
+			if !exist {
+				// If non member of tSet then it's added to it
 				tSet = append(tSet, moveEpsClosure)
+				// And it's added a new state (+ transition) to the equivalent NCA
+				DCA.AddTransition(idMap[closure.Id], fsa.NewState, transition)
+				idMap[moveEpsClosure.Id] = DCA.GetLastId()
+			} else {
+				// Else only a transition its added to the already present state
+				DCA.AddTransition(idMap[closure.Id], idMap[twinId], transition)
 			}
 		}
 
 		nIteration++
 	}
 
-	return fsa.FSA{}
+	return DCA
 }
 
 func getEpsClosure(NDCA *fsa.FSA, states ...fsa.State) *closure.Closure {
@@ -121,12 +143,12 @@ func reachWithMove(move fsa.MoveKind, closureSet *closure.Closure, NDCA *fsa.FSA
 	return stateList
 }
 
-func isContained(item *closure.Closure, set []*closure.Closure) bool {
+func isContained(item *closure.Closure, set []*closure.Closure) (bool, int) {
 	for _, element := range set {
 		if element.IsEqual(item) {
-			return true
+			return true, element.Id
 		}
 	}
 
-	return false
+	return false, -1
 }
