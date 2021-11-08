@@ -32,7 +32,7 @@ func extractProjectionNDCAs(funcMeta meta.FuncMetadata, fileMeta meta.FileMetada
 	// ! Debug print, will be removed
 	fmt.Printf("Local copy of '%s' ScopeAutomata at %p, other at %p\n", funcMeta.Name, localCopy, funcMeta.ScopeAutomata)
 
-	// Executes a function on each Transition (edge) of the Graph
+	// Executes the following  on each Transition (edge) of the Graph
 	for _, state := range localCopy.StateIterator() {
 		for to, t := range state.TransitionIterator() {
 			if t.Move == fsa.Call {
@@ -48,7 +48,12 @@ func extractProjectionNDCAs(funcMeta meta.FuncMetadata, fileMeta meta.FileMetada
 				if hasMeta {
 					// Recurively call extractProjectionNDCAs on the spawned GoRoutine entrypoint (the function
 					// scalled with go keyword), then add the extracted NDCAs to the current list
-					extractedNDCAs = append(extractedNDCAs, extractProjectionNDCAs(calledFuncMeta, fileMeta)...)
+					newNDCAs := extractProjectionNDCAs(calledFuncMeta, fileMeta)
+					extractedNDCAs = append(extractedNDCAs, newNDCAs...)
+					// ? Could be a ref to old version once removed eps-transition
+					// Overrides the older transtion with additional data
+					newT := fsa.Transition{Move: fsa.Spawn, Label: t.Label, Payload: newNDCAs[0]}
+					localCopy.AddTransition(state.Id, to, newT)
 				} else { // Transforms the transition in an eps-transition (that later will be removed)
 					log.Fatalf("Couldn't find function %s spawned as Go Routine\n", t.Label)
 				}

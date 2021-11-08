@@ -20,6 +20,7 @@ func test(callback func(int) int, channel chan int) int {
 
 func void() int {
 	// Does nothing
+	global <- 3
 	return 1
 }
 
@@ -40,10 +41,10 @@ func main() {
 	var channel = make(chan int)
 	boundedChan := make(chan string, 10)
 
-	sum(s, channel)
+	// sum(s, channel)
 
 	go sum(s, channel)
-	go sum(s[len(s)/2:], channel)
+	go void(s[len(s)/2:], channel)
 
 	// go func(x int) {
 	// fmt.Println("Hello from anonymous function")
