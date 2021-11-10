@@ -67,8 +67,7 @@ func extractProjectionNDCAs(funcMeta meta.FuncMetadata, fileMeta meta.FileMetada
 // TODO implement
 func subsetConstructionAlgorithm(NDCA *fsa.FSA) *fsa.FSA {
 	// Initialization of some basic fields
-	sigmaAlphabet := []fsa.MoveKind{fsa.Recv, fsa.Send, fsa.Spawn}
-	firstEpsClosure := getEpsClosure(NDCA, NDCA.GetState(0))
+	firstEpsClosure := getEpsClosure(NDCA, nil, NDCA.GetState(0))
 	tSet := []*closure.Closure{firstEpsClosure}
 
 	DCA := fsa.New()           // The deterministic DCA
@@ -80,11 +79,11 @@ func subsetConstructionAlgorithm(NDCA *fsa.FSA) *fsa.FSA {
 	// on a struct that changes inside a loop, some element are not guaranteed to be iterated
 	for nIteration < len(tSet) {
 		closure := tSet[nIteration] // Extracts the closure to be evaluated
-		closure.ExportAsSVG(fmt.Sprintf("debug/eps-closure-%d.svg", closure.Id))
+		closure.ExportAsSVG(fmt.Sprintf("debug/eps-closure--%p-%d.svg", NDCA, closure.Id))
 
-		for _, possibleMove := range sigmaAlphabet {
-			reachedByMove := reachWithMove(possibleMove, closure, NDCA)
-			moveEpsClosure := getEpsClosure(NDCA, reachedByMove...)
+		for _, possibleTransition := range closure.TransitionIterator() {
+			reachedByMove := reachWithMove(possibleTransition, closure, NDCA)
+			moveEpsClosure := getEpsClosure(NDCA, nil, reachedByMove...)
 
 			// Ignores the error state, from which is not possible to escape
 			if moveEpsClosure.IsEmpty() {
@@ -92,17 +91,16 @@ func subsetConstructionAlgorithm(NDCA *fsa.FSA) *fsa.FSA {
 			}
 
 			exist, twinId := isContained(moveEpsClosure, tSet)
-			transition := fsa.Transition{Move: possibleMove, Label: string(possibleMove)}
 
 			if !exist {
 				// If non member of tSet then it's added to it
 				tSet = append(tSet, moveEpsClosure)
 				// And it's added a new state (+ transition) to the equivalent NCA
-				DCA.AddTransition(idMap[closure.Id], fsa.NewState, transition)
+				DCA.AddTransition(idMap[closure.Id], fsa.NewState, possibleTransition)
 				idMap[moveEpsClosure.Id] = DCA.GetLastId()
 			} else {
 				// Else only a transition its added to the already present state
-				DCA.AddTransition(idMap[closure.Id], idMap[twinId], transition)
+				DCA.AddTransition(idMap[closure.Id], idMap[twinId], possibleTransition)
 			}
 		}
 
@@ -112,34 +110,36 @@ func subsetConstructionAlgorithm(NDCA *fsa.FSA) *fsa.FSA {
 	return DCA
 }
 
-func getEpsClosure(NDCA *fsa.FSA, states ...fsa.State) *closure.Closure {
-	epsClosure := closure.New()
+func getEpsClosure(NDCA *fsa.FSA, prevClosure *closure.Closure, states ...fsa.State) *closure.Closure {
+	if prevClosure == nil {
+		prevClosure = closure.New()
+	}
 
 	for _, state := range states {
-		epsClosure.Add(state) // A state always belong to its epsClosure
+		prevClosure.Add(state) // A state always belong to its epsClosure
 
 		// For each state reachable with an eps transition from this one we calculate
 		// its own epsClosure and we merge the two together
 		for destId, transition := range state.TransitionIterator() {
 			// Skips non-eps transition or destination already included
-			if transition.Move != fsa.Eps || epsClosure.Exist(destId) {
+			if transition.Move != fsa.Eps || prevClosure.Exist(destId) {
 				continue
 			}
 			reachedState := NDCA.GetState(destId)
-			reachedEpsClosure := getEpsClosure(NDCA, reachedState)
-			epsClosure.Add(reachedEpsClosure.Iterator()...)
+			reachedEpsClosure := getEpsClosure(NDCA, prevClosure, reachedState)
+			prevClosure.Add(reachedEpsClosure.Iterator()...)
 		}
 	}
 
-	return epsClosure
+	return prevClosure
 }
 
-func reachWithMove(move fsa.MoveKind, closureSet *closure.Closure, NDCA *fsa.FSA) []fsa.State {
+func reachWithMove(t fsa.Transition, closureSet *closure.Closure, NDCA *fsa.FSA) []fsa.State {
 	stateList := []fsa.State{}
 
 	for _, state := range closureSet.Iterator() {
 		for destId, transition := range state.TransitionIterator() {
-			if transition.Move == move {
+			if transition.Move == t.Move && transition.Label == t.Label {
 				stateList = append(stateList, NDCA.GetState(destId))
 			}
 		}

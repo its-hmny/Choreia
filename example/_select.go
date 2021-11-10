@@ -23,4 +23,6 @@ func main() {
 	}
 
 	<-boom
+
+	tick <- false
 }

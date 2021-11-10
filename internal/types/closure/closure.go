@@ -82,6 +82,22 @@ func (closure *Closure) Iterator() []fsa.State {
 	return flattened
 }
 
+// Iteator will return a list of possible fsa.Transition possible from the closure.
+func (closure *Closure) TransitionIterator() []fsa.Transition {
+	list := []fsa.Transition{}
+	for _, state := range closure.items {
+		for _, t := range state.TransitionIterator() {
+			// Ignore eps transition
+			if t.Move == fsa.Eps {
+				continue
+			}
+
+			list = append(list, t)
+		}
+	}
+	return list
+}
+
 // ExportAsSVG will export a .svg representation of the closure saved at the given path.
 func (closure *Closure) ExportAsSVG(path string) {
 	// Creates a GraphViz instance and initializes a Graph instance
