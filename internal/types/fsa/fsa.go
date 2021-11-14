@@ -23,7 +23,7 @@ const (
 )
 
 // ----------------------------------------------------------------------------
-// TransitionGraph
+// FSA
 
 // A FSA is a graph that represents all the possible transition from a state to the others
 //

@@ -23,14 +23,15 @@ func main() {
 	inputFile := getopt.StringLong("input", 'i', "", "The .go file from which extract the Choreography Automata")
 	traceFlag := getopt.BoolLong("trace", 't', "Pretty prints on the console the AST", "false")
 	extTraceFlag := getopt.BoolLong("ext-trace", 'e', "Pretty prints on the console the expanded AST", "false")
-	getopt.BoolLong("help", 'h', "Display this help message", "false")
+	showUsage := getopt.BoolLong("help", 'h', "Display this help message", "false")
 	getopt.Parse() // Parses the program arguments
 
 	// Logger setup
 	log.SetPrefix("[Choreia] ")
 	log.SetFlags(log.Ltime | log.Lshortfile)
 
-	if inputFile == nil && *inputFile == "" { // Checks for the existence of input file
+	// Checks that the input file is provided via CLI argument
+	if *showUsage || inputFile == nil || *inputFile == "" {
 		getopt.Usage()
 		return
 	}
