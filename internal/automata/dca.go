@@ -14,15 +14,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/Workiva/go-datastructures/list"
 	"github.com/its-hmny/Choreia/internal/meta"
 	"github.com/its-hmny/Choreia/internal/types/fsa"
 )
-
-type SimulatedFSA struct {
-	fsa          *fsa.FSA
-	currentState int
-}
 
 // TODO comment
 // TODO comment
@@ -34,76 +28,18 @@ func GenerateDCA(fileMeta meta.FileMetadata) *fsa.FSA {
 		log.Fatal("Cannot extract Partial Automata, 'main' function metadata not found")
 	}
 
-	// Extracts reursively from the metadata the Projection NDCA, each one of them
-	// will be a projection of the final one and will still have eps-transtion
-	projectionNDCAs := extractProjectionNDCAs(mainFuncMeta, fileMeta)
-	projectionDCAs := make([]*fsa.FSA, len(projectionNDCAs))
+	// Extracts reursively from the metadata the Projection DCAs, each one of them
+	// will be a projection of the final one but it has lost all of his eps-transition
+	projectionDCAs := extractProjectionDCAs(mainFuncMeta, fileMeta)
 
 	// ! Debug print, will be removed
-	fmt.Printf("Successfully extracted %d Projection NCAs\n", len(projectionNDCAs))
-
-	// Removes eps-transition from each Projection NDCA transforming them in
-	// equivalent DCA (but we're still working with Projection DCA)
-	for i, NCA := range projectionNDCAs {
-		NCA.ExportAsSVG(fmt.Sprintf("debug/before-eps-removal-%d.svg", i))
-		projectionDCAs[i] = subsetConstructionAlgorithm(NCA)
-		projectionDCAs[i].ExportAsSVG(fmt.Sprintf("debug/after-eps-removal-%d.svg", i))
+	fmt.Printf("Successfully extracted %d Projection NCAs\n", len(projectionDCAs))
+	for i, DCA := range projectionDCAs {
+		DCA.ExportAsSVG(fmt.Sprintf("debug/projectionDCAs-%d.svg", i))
 	}
 
 	// Takes the deterministic version of the Partial Automatas and merges them
 	// in one DCA that will represent the choreography as a whole
-	return reconciliationAlgorithm(projectionNDCAs)
-}
-
-func reconciliationAlgorithm(NDCAs []*fsa.FSA) *fsa.FSA {
-	finalDCA := fsa.New()
-	activeNDCAs := list.Empty.Add(SimulatedFSA{NDCAs[0], 0})
-	blockedNDCAs := list.Empty
-
-	for !activeNDCAs.IsEmpty() {
-		// Get a reference to a NDCA and before removing it from the list
-		item, exist := activeNDCAs.Get(0)
-		activeNDCAs, _ = activeNDCAs.Remove(0)
-
-		// Some work with the fsa
-		simNDCA, isSimulatedFSA := item.(SimulatedFSA)
-		currentSimState := simNDCA.fsa.GetState(simNDCA.currentState)
-
-		if !exist || !isSimulatedFSA {
-			log.Fatal("Error while removing NDCA from list")
-		}
-
-		for destId, transition := range currentSimState.TransitionIterator() {
-			// ! Will be removed
-			fmt.Printf("Encountered %s\n", transition)
-
-			// ? How to behave with "recursive" transition (from x to x)
-			if destId == currentSimState.Id {
-				continue
-			}
-
-			switch transition.Move {
-			case fsa.Eps:
-				// Inserts the current back at the top of the list
-				activeNDCAs = activeNDCAs.Add(SimulatedFSA{simNDCA.fsa, destId})
-			case fsa.Spawn:
-				// Inserts the spawnee at the bottom of the list
-				spawneeFSA := transition.Payload.(*fsa.FSA)
-				activeNDCAs, _ = activeNDCAs.Insert(SimulatedFSA{spawneeFSA, 0}, activeNDCAs.Length())
-				// But the current keep is previous position at the top of the list
-				activeNDCAs = activeNDCAs.Add(SimulatedFSA{simNDCA.fsa, destId})
-			case fsa.Send:
-			case fsa.Recv:
-			default:
-				log.Fatal("Unrecognized transition move", destId)
-			}
-
-		}
-	}
-
-	if !blockedNDCAs.IsEmpty() {
-		log.Fatal("Some NDCA(s) are still waiting, there's some problem in your code")
-	}
-
-	return finalDCA
+	// TODO implement
+	return fsa.New()
 }

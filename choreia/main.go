@@ -14,7 +14,7 @@ import (
 
 	// Choreia internal metatdata extraction module
 	"github.com/its-hmny/Choreia/internal/meta"
-	// Choreia internal module for CDA handling
+	// Choreia internal Choreography Automata transformation module
 	"github.com/its-hmny/Choreia/internal/automata"
 )
 
