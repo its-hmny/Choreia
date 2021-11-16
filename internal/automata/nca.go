@@ -37,7 +37,10 @@ func extractProjectionDCAs(funcMeta meta.FuncMetadata, fileMeta meta.FileMetadat
 			if t.Move == fsa.Call {
 				calleeMeta, hasMeta := fileMeta.FunctionMeta[t.Label]
 				if hasMeta { // Expands in place the ScopeAutomata of the called function
-					localCopy.ExpandInPlace(state.Id, to, *calleeMeta.ScopeAutomata)
+					// Expands meaningful (Channel e Function/Callback) positional argument with
+					// the actual ones so that any Transition reference the actual channel at runtime
+					withInlineArgs := expandActualArgs(t, calleeMeta)
+					localCopy.ExpandInPlace(state.Id, to, *withInlineArgs)
 				} else { // Transforms the transition in an eps-transition (that later will be removed)
 					newT := fsa.Transition{Move: fsa.Eps, Label: "unknown-function-call"}
 					localCopy.AddTransition(state.Id, to, newT) // Overwrites the current one
@@ -45,6 +48,8 @@ func extractProjectionDCAs(funcMeta meta.FuncMetadata, fileMeta meta.FileMetadat
 			} else if t.Move == fsa.Spawn {
 				calledFuncMeta, hasMeta := fileMeta.FunctionMeta[t.Label]
 				if hasMeta {
+					// Expands again the positional arguments with the actual ones
+					calledFuncMeta.ScopeAutomata = expandActualArgs(t, calledFuncMeta)
 					// Recursively call extractProjectionNDCAs on the spawned GoRoutine entrypoint (the function
 					// called with go keyword), then add the extracted NDCAs to the current list
 					newNDCAs := extractProjectionDCAs(calledFuncMeta, fileMeta)
@@ -66,6 +71,44 @@ func extractProjectionDCAs(funcMeta meta.FuncMetadata, fileMeta meta.FileMetadat
 	extractedNDCAs[0] = getDeterministicForm(localCopy)
 
 	return extractedNDCAs
+}
+
+// Expands meaningful (Channel e Function/Callback) positional argument with the actual ones so that any
+// Transition reference the actual channel at runtime. The function uses the offset of the arguments
+// and their types to determine which positional argument has to be replaced with the "actual" ones
+func expandActualArgs(t fsa.Transition, calleeMeta meta.FuncMetadata) *fsa.FSA {
+	localCopy := calleeMeta.ScopeAutomata.Copy()
+	expandArgs, isList := t.Payload.([]meta.FuncArg)
+
+	// Bails out at the first discrepancy returning a non-expanded copy
+	if !isList || len(expandArgs) <= 0 || len(calleeMeta.InlineArgs) <= 0 {
+		return localCopy
+	}
+
+	for _, actualArg := range expandArgs {
+		for _, funcArg := range calleeMeta.InlineArgs {
+			// Tries to find a match beetwen the actual argument and the positional argument
+			if funcArg.Offset != actualArg.Offset || funcArg.Type != actualArg.Type {
+				continue
+			}
+
+			// If such is found then all the transition in the localCopy that references that
+			// positional argument are replaced with transition to the actual argument
+			for _, state := range localCopy.StateIterator() {
+				for destId, t := range state.TransitionIterator() {
+					if funcArg.Type == meta.Channel && (t.Move == fsa.Recv || t.Move == fsa.Send) {
+						// Overrides the older transition with additional data
+						t.Label = actualArg.Name
+						localCopy.AddTransition(state.Id, destId, t)
+					}
+
+					// ? Handle funcArg.Type == Function as well
+				}
+			}
+		}
+	}
+
+	return localCopy
 }
 
 // Removes eps-transition from a given NDCA (Non-Deterministic Choreography Automata) transforming it

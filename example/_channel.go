@@ -14,8 +14,9 @@ v := <-ch  // Receive from ch, and assign value to v.
 
 var global = make(chan int, 1)
 
-func test(callback func(int) int, channel chan int) int {
-	return (callback(<-channel))
+func test(yyy chan int, xxx chan int) {
+	<-xxx
+	yyy <- 3
 }
 
 func void() int {
@@ -41,10 +42,11 @@ func main() {
 	var channel = make(chan int)
 	boundedChan := make(chan string, 10)
 
-	// sum(s, channel)
+	test(channel, channel)
+	sum(s, boundedChan)
 
 	go sum(s, channel)
-	go void(s[len(s)/2:], channel)
+	go sum(s[len(s)/2:], channel)
 
 	// go func(x int) {
 	// fmt.Println("Hello from anonymous function")

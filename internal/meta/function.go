@@ -193,6 +193,23 @@ func parseGoStmt(stmt *ast.GoStmt, fm *FuncMetadata) {
 	// Then extracts the data accordingly
 	if isFuncIdent {
 		tSpawn := fsa.Transition{Move: fsa.Spawn, Label: funcIdent.Name}
+
+		// Parses the GoStmt arguments looking for channels and saves the "actual" argument to list
+		// in the Transition. Later this channels will be inlined during the generation of the automaton
+		// ! Remove starting duplicate at line 240
+		for i, arg := range stmt.Call.Args {
+			argIdent, isIdent := arg.(*ast.Ident)
+			if isIdent {
+				_, isChannel := fm.ChanMeta[argIdent.Name]
+				if isChannel {
+					funcArgList, _ := tSpawn.Payload.([]FuncArg)
+					newFuncArg := FuncArg{Offset: i, Name: argIdent.Name, Type: Channel}
+					tSpawn.Payload = append(funcArgList, newFuncArg)
+				}
+			}
+		}
+
+		// At last add the transition (with the payload) to the ScopeAutomata
 		fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tSpawn)
 	} else if isFuncAnonymous {
 		anonFuncName := fmt.Sprintf("%s-%s", anonymousFunc, fm.Name)
@@ -217,5 +234,22 @@ func parseCallExpr(expr *ast.CallExpr, fm *FuncMetadata) {
 
 	// Creates a valid transaction struct
 	tCall := fsa.Transition{Move: fsa.Call, Label: funcIdent.Name}
+
+	// Parses the CallExpr arguments looking for channels and saves the "actual" argument to list
+	// in the Transition. Later this channels will be inlined during the generation of the automaton
+	// ! Remove starting duplicate at line 199
+	for i, arg := range expr.Args {
+		argIdent, isIdent := arg.(*ast.Ident)
+		if isIdent {
+			_, isChannel := fm.ChanMeta[argIdent.Name]
+			if isChannel {
+				funcArgList, _ := tCall.Payload.([]FuncArg)
+				newFuncArg := FuncArg{Offset: i, Name: argIdent.Name, Type: Channel}
+				tCall.Payload = append(funcArgList, newFuncArg)
+			}
+		}
+	}
+
+	// At last add full the transition to the ScopeAutomata of the FuncMetadata
 	fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tCall)
 }
