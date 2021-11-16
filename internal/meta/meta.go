@@ -3,7 +3,7 @@
 // This package handles the parsing of a given file which should represents
 // the content of a Go source file as an Abstract Syntax Tree.
 
-// The only method avaiable from the outside is ExtractMetadata which is the only entrypoint
+// The only method available from the outside is ExtractMetadata which is the only entrypoint
 // of the module and will return a FileMetadata struct containing some info bout provided file.
 package meta
 
@@ -30,7 +30,7 @@ const (
 type TraceMode int
 
 // A simple type alias that fullfills the ast.Visitor interface and implements
-// the Visi() function, this will print a trace on the stdin of the structure of the AST
+// the Visit() function, this will print a trace on the stdin of the structure of the AST
 type traceVisitor int
 
 func (v traceVisitor) Visit(node ast.Node) ast.Visitor {
@@ -46,12 +46,12 @@ func (v traceVisitor) Visit(node ast.Node) ast.Visitor {
 // Meta package API
 
 // Parses the file identified by the given path, if the latter is valid, if the user
-// opted in the avaible trace option handles the traces as well then extracts the metadata
+// opted in the available trace option handles the traces as well then extracts the metadata
 // from the AST and returns said metadata to the caller
 func ExtractMetadata(filePath string, traceOpts TraceMode) FileMetadata {
 	// At first checks that the given input path actually exists
 	if fStat, err := os.Stat(filePath); os.IsNotExist(err) || fStat.IsDir() {
-		log.Fatal("A path to an existing go source file is neeeded")
+		log.Fatal("A path to an existing go source file is needed")
 	}
 
 	// Parses the file and retrieves the AST

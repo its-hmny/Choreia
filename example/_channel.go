@@ -3,7 +3,7 @@ package main
 import "fmt"
 
 /*
-// Unbuffered, synchronous comunication
+// Non-Buffered, synchronous comunication
 ch := make(chan int)
 // Buffered, asynchronous comunication till the buffer is full
 ch := make(chan int, 100)

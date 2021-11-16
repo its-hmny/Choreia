@@ -54,7 +54,7 @@ func main() {
 		traceOpts = meta.ExtendedTrace
 	}
 
-	// Parses and esxtracts the metadata from the given file
+	// Parses and extracts the metadata from the given file
 	fileMetadata := meta.ExtractMetadata(*inputFile, traceOpts)
 
 	// ! From here on is all a work in progress

@@ -3,9 +3,9 @@
 // This package handles the parsing of a given *ast.File which represents
 // the content of a Go source file as an Abstract Syntax Tree.
 
-// The only method avaiable from the outside is ParseAssignStmt and ParseExprStmt,
+// The only method available from the outside is ParseAssignStmt and ParseExprStmt,
 // both are two generic statement in which multiple interesting thing can occur
-// and this method acts as "orchestrator" of their specilized counterparts
+// and this method acts as "orchestrator" of their specialized counterparts
 package meta
 
 import (
@@ -17,7 +17,7 @@ import (
 // In particular this statement can have a recv from a channel, a function call or a channel init
 // all three with the return value then assigned to a variable/identifier
 func parseAssignStmt(stmt *ast.AssignStmt, fm *FuncMetadata) {
-	// Check that the number of rvalues are the same of lvalues (values assignments) in the statement
+	// Check that the number of rvalue are the same of lvalue (values assignments) in the statement
 	if len(stmt.Lhs) != len(stmt.Rhs) {
 		log.Fatalf("Not the same number of lVal and rVal in AssignStmt at line %d\n", stmt.Pos())
 	}

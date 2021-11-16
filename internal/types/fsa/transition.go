@@ -3,7 +3,7 @@
 // This package implements a Finite State Automata (FSA) data structure and its own API.
 // For this specific use cases the implementation is quite simple & basic
 
-// The only struct avaiable from the outside is Transition and its own API adn related enum
+// The only struct available from the outside is Transition and its own API adn related enum
 package fsa
 
 import "fmt"

@@ -3,7 +3,7 @@
 // This package implements a Finite State Automata (FSA) data structure and its own API.
 // For this specific use cases the implementation is quite simple & basic
 
-// The only method avaiable from the outside are FSA and its API
+// The only method available from the outside are FSA and its API
 package fsa
 
 import (
@@ -50,22 +50,22 @@ func New() *FSA {
 	}
 }
 
-// This function generates an indipendet copy of the given FSA and returns it
+// This function generates an independent copy of the given FSA and returns it
 func (original *FSA) Copy() *FSA {
 	copy := FSA{
 		currentId: original.currentId,
 		states:    make([]State, 0, len(original.states)),
 	}
 
-	for _, currenState := range original.states {
+	for _, currentState := range original.states {
 		// Creates a new map, overriding the copied one (since map instance remains intertwined)
-		currenState.transition = make(map[int]Transition)
+		currentState.transition = make(map[int]Transition)
 		// Copies all the entry of the other map into the decoupled one
-		for dest, t := range original.states[currenState.Id].transition {
-			currenState.transition[dest] = t
+		for dest, t := range original.states[currentState.Id].transition {
+			currentState.transition[dest] = t
 		}
 		// Then adds the fully copied state to the copy FSA
-		copy.states = append(copy.states, currenState)
+		copy.states = append(copy.states, currentState)
 	}
 
 	return &copy
@@ -103,7 +103,7 @@ func (fsa *FSA) GetState(stateId int) State {
 }
 
 // This function adds a new State to the TransitionGraph generating its
-// id incrementally with respects to the previusly existent state
+// id incrementally with respects to the previously existent state
 func (fsa *FSA) newState() (id int) {
 	id = len(fsa.states) // Generates a new id
 	fsa.states = append(fsa.states, State{

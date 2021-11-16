@@ -3,7 +3,7 @@
 // This package handles the parsing of a given *ast.File which represents
 // the content of a Go source file as an Abstract Syntax Tree.
 
-// The only method avaiable from the outside is ParseFile which, as the name suggest, will return
+// The only method available from the outside is ParseFile which, as the name suggest, will return
 // a FileMetadata struct containing some info needed by the caller for further uses.
 package meta
 
@@ -16,7 +16,7 @@ import (
 // ----------------------------------------------------------------------------
 // FileMetadata
 
-// A FileMetadata contains the metadata avaiable about a Go source file
+// A FileMetadata contains the metadata available about a Go source file
 //
 // A struct containing all the metadata that the algorithm has been able to
 // extrapolate from the parsed file.
@@ -55,9 +55,9 @@ func (fm *FileMetadata) addFunctionMeta(functionMetas ...FuncMetadata) {
 	}
 }
 
-// In order to satify the ast.Visitor interface FileMetadata implements
+// In order to satisfy the ast.Visitor interface FileMetadata implements
 // the Visit() method with this function signature. The Visit method takes as
-// only argument an ast.Node interface and evaluates all the meaninggul cases,
+// only argument an ast.Node interface and evaluates all the meaningful cases,
 // when the function steps into that it tries to extract metada from the subtree
 func (fm FileMetadata) Visit(node ast.Node) ast.Visitor {
 	// Skips empty nodes during descend
@@ -91,9 +91,9 @@ func (fm FileMetadata) Visit(node ast.Node) ast.Visitor {
 
 // This function handles the extraction of metadata about the given file, it simply
 // receives an *ast.File as input and call ast.Walk on it. Whenever it encounters something
-// interesting such as global channel or function declaration it saves the metadata avaiable
+// interesting such as global channel or function declaration it saves the metadata available
 func parseAstFile(file *ast.File) FileMetadata {
-	// Intializes the FileMetadata struct
+	// Initializes the FileMetadata struct
 	metadata := FileMetadata{
 		GlobalChanMeta: map[string]ChanMetadata{},
 		FunctionMeta:   map[string]FuncMetadata{},

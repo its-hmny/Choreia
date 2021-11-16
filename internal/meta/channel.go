@@ -3,7 +3,7 @@
 // This package handles the parsing of a given *ast.File which represents
 // the content of a Go source file as an Abstract Syntax Tree.
 
-// The only method avaiable from the outside is ParseGenDecl, ParseDeclStmt, ParseSendStmt,
+// The only method available from the outside is ParseGenDecl, ParseDeclStmt, ParseSendStmt,
 // ParseRecvStmt and ParseSelectStmt which will add to the given FileMetadata argument the
 // data collected from the parsing phases
 package meta
@@ -20,7 +20,7 @@ import (
 // ----------------------------------------------------------------------------
 // ChanMetadata
 
-// A ChanMetadata contains the metadata avaiable about a Go channel
+// A ChanMetadata contains the metadata available about a Go channel
 //
 // A struct containing all the metadata that the algorithm has been able to
 // extrapolate from a channel declaration or assignment. Only the channel declared
@@ -75,7 +75,7 @@ func parseSelectStmt(stmt *ast.SelectStmt, fm *FuncMetadata) {
 
 	for i, bodyStmt := range stmt.Body.List {
 		// Convert the bodyStmt to a CommClause one, this is always possible at the moment
-		// since we're parsing a "select" statement and this is the only option avaiable
+		// since we're parsing a "select" statement and this is the only option available
 		commClause := bodyStmt.(*ast.CommClause)
 
 		// Generate an eps-transition to represent the fork/branch (the cases in the select)
@@ -112,7 +112,7 @@ func parseDeclStmt(stmt *ast.DeclStmt, fm *FuncMetadata) {
 	genDecl, isGenDecl := stmt.Decl.(*ast.GenDecl)
 
 	if !isGenDecl {
-		log.Fatalf("Couldn't get the GenDecl statement fron the DeclStmt at line %d\n", stmt.Pos())
+		log.Fatalf("Couldn't get the GenDecl statement from the DeclStmt at line %d\n", stmt.Pos())
 	}
 
 	chanMeta := parseGenDecl(genDecl)

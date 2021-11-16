@@ -3,7 +3,7 @@
 // This package handles the parsing of a given *ast.File which represents
 // the content of a Go source file as an Abstract Syntax Tree.
 
-// The only method avaiable from the outside is ParseForStmt and ParseRangeStmt which will add to the
+// The only method available from the outside is ParseForStmt and ParseRangeStmt which will add to the
 // given FileMetadata argument the data collected from the parsing of the respective constructs
 package meta
 
@@ -53,7 +53,7 @@ func parseRangeStmt(stmt *ast.RangeStmt, fm *FuncMetadata) {
 	matchFound := false
 
 	// Checks if the iteratee identifier is a locally declared channel, eventually sets a flag
-	// this is neede because "ranging" over a channel is equal to receiving multiple time from it
+	// this is needs because "ranging" over a channel is equal to receiving multiple time from it
 	if isIdent {
 		for _, chanMeta := range fm.ChanMeta { // ? add support for global channel
 			if chanMeta.Name == iterateeIdent.Name {
@@ -63,8 +63,8 @@ func parseRangeStmt(stmt *ast.RangeStmt, fm *FuncMetadata) {
 	}
 
 	// Generate an eps-transition to represent the fork/branch (the iteration block in the loop)
-	// and add it as a transaction, if we're using range on a channel then the transition becames
-	// a Recv trnasition since on channel this is the default overload of "range" keyword
+	// and add it as a transaction, if we're using range on a channel then the transition became
+	// a Recv transition since on channel this is the default overload of "range" keyword
 	if matchFound {
 		tEpsStart := fsa.Transition{Move: fsa.Recv, Label: iterateeIdent.Name}
 		fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tEpsStart)

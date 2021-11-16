@@ -3,7 +3,7 @@
 // This package handles the parsing of a given *ast.File which represents
 // the content of a Go source file as an Abstract Syntax Tree.
 
-// The only method avaiable from the outside is ParseGenDecl, ParseDeclStmt, ParseSendStmt,
+// The only method available from the outside is ParseGenDecl, ParseDeclStmt, ParseSendStmt,
 // ParseRecvStmt and ParseSelectStmt which will add to the given FileMetadata argument the
 // data collected from the parsing phases
 package meta
@@ -68,7 +68,7 @@ func parseSwitchStmt(stmt *ast.SwitchStmt, fm *FuncMetadata) {
 
 	for i, bodyStmt := range stmt.Body.List {
 		// Convert the bodyStmt to a CaseClause one, this is always possible at the moment
-		// since we're parsing a "switch" statement and this is the only option avaiable
+		// since we're parsing a "switch" statement and this is the only option available
 		caseClauseStmt := bodyStmt.(*ast.CaseClause)
 
 		// Generate an eps-transition to represent the fork/branch (the cases in the select)
@@ -112,7 +112,7 @@ func parseTypeSwitchStmt(stmt *ast.TypeSwitchStmt, fm *FuncMetadata) {
 
 	for i, bodyStmt := range stmt.Body.List {
 		// Convert the bodyStmt to a CaseClause one, this is always possible at the moment
-		// since we're parsing a "switch" statement and this is the only option avaiable
+		// since we're parsing a "switch" statement and this is the only option available
 		caseClauseStmt := bodyStmt.(*ast.CaseClause)
 
 		// Generate an eps-transition to represent the fork/branch (the cases in the select)
@@ -141,4 +141,4 @@ func parseTypeSwitchStmt(stmt *ast.TypeSwitchStmt, fm *FuncMetadata) {
 	fm.ScopeAutomata.SetRootId(mergeStateId)
 }
 
-// ! Refactor the ParseTypeSwitchStmt and ParseSwitchSmtt functions
+// ! Refactor the ParseTypeSwitchStmt and ParseSwitchStmt functions

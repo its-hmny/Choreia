@@ -1,11 +1,11 @@
 // Copyright Enea Guidi (hmny).
 
-// This package handles the extraction of Partial Nondeterministic Automatas from
+// This package handles the extraction of Partial Nondeterministic Automaton from
 // metadata extracted and the handling and subsequent transformation of abovesaid
 // NDCA until a single Deterministic Choreography Automata is obtained by them
 
 // This module defines some helper function to transform and work with NDCAs
-// (Non-Deterministic Choreography Automatas). Such transformations could be extracting
+// (Non-Deterministic Choreography Automaton). Such transformations could be extracting
 // the NDCAs from given metadata or removing Eps transition from them (making them DCAs)
 package automata
 
@@ -24,7 +24,7 @@ import (
 // NOTE: This function should be called with the metadata of a function that is the entrypoint of one
 // or more GoRoutine (the function called on a the spawned routine).
 func extractProjectionDCAs(funcMeta meta.FuncMetadata, fileMeta meta.FileMetadata) []*fsa.FSA {
-	// Makes a full indipendent copy of the ScopeAutomata
+	// Makes a full independent copy of the ScopeAutomata
 	localCopy := funcMeta.ScopeAutomata.Copy()
 	// List of Projection DCA extracted from the current recursive call,
 	// the first position is reserved to the currently evaluated ScopeAutomata
@@ -39,21 +39,21 @@ func extractProjectionDCAs(funcMeta meta.FuncMetadata, fileMeta meta.FileMetadat
 				if hasMeta { // Expands in place the ScopeAutomata of the called function
 					localCopy.ExpandInPlace(state.Id, to, *calleeMeta.ScopeAutomata)
 				} else { // Transforms the transition in an eps-transition (that later will be removed)
-					newT := fsa.Transition{Move: fsa.Eps, Label: "unknown-fuction-call"}
+					newT := fsa.Transition{Move: fsa.Eps, Label: "unknown-function-call"}
 					localCopy.AddTransition(state.Id, to, newT) // Overwrites the current one
 				}
 			} else if t.Move == fsa.Spawn {
 				calledFuncMeta, hasMeta := fileMeta.FunctionMeta[t.Label]
 				if hasMeta {
-					// Recurively call extractProjectionNDCAs on the spawned GoRoutine entrypoint (the function
-					// scalled with go keyword), then add the extracted NDCAs to the current list
+					// Recursively call extractProjectionNDCAs on the spawned GoRoutine entrypoint (the function
+					// called with go keyword), then add the extracted NDCAs to the current list
 					newNDCAs := extractProjectionDCAs(calledFuncMeta, fileMeta)
 					extractedNDCAs = append(extractedNDCAs, newNDCAs...)
-					// Overrides the older transtion with additional data
+					// Overrides the older transition with additional data
 					newT := fsa.Transition{Move: fsa.Spawn, Label: t.Label, Payload: newNDCAs[0]}
 					localCopy.AddTransition(state.Id, to, newT)
 				} else {
-					// Exit with errror since we cannot determine the final Choreography correctly
+					// Exit with error since we cannot determine the final Choreography correctly
 					log.Fatalf("Couldn't find function %s spawned as Go Routine\n", t.Label)
 				}
 			}
@@ -76,7 +76,7 @@ func getDeterministicForm(NDCA *fsa.FSA) *fsa.FSA {
 	idMap := make(map[int]int) // To map the id of the closures to the id of the FSA's states
 
 	// Initialization of some basic fields, such as the eps-closure of the first state,
-	// the tSet (a set of eps-slosure) and the nIteration counter that will be used to iterate
+	// the tSet (a set of eps-closure) and the nIteration counter that will be used to iterate
 	// over tSet without using the "range" construct that uses a "frozen" copy of the iteratee
 	// and doesn't allow for everchanging value
 	firstEpsClosure := getEpsClosure(NDCA, nil, NDCA.GetState(0))
@@ -97,7 +97,7 @@ func getDeterministicForm(NDCA *fsa.FSA) *fsa.FSA {
 			moveEpsClosure := getEpsClosure(NDCA, nil, reachedByMove...)
 
 			// Ignores the error state (empty eps-closure), from which is not possible to escape
-			// this state doen't provide any information about the automata and "bloats" the representation
+			// this state doesn't provide any information about the automata and "bloats" the representation
 			if moveEpsClosure.IsEmpty() {
 				continue
 			}
@@ -126,10 +126,10 @@ func getDeterministicForm(NDCA *fsa.FSA) *fsa.FSA {
 
 // Given one (or more states) and the FSA to which said states belong to, extracts the aggregate eps-closure
 // of the states in list, recursively, and returns it to the caller. The "prevClosure" argument is used internally
-// by the function to avoid cyclcing on states already visited as well as avoiding recursive infinite loop on
+// by the function to avoid cycling on states already visited as well as avoiding recursive infinite loop on
 // cyclic transition (from x to x itself). This argument should be nil when calling the function from outside
 func getEpsClosure(NDCA *fsa.FSA, prevClosure *closure.Closure, states ...fsa.State) *closure.Closure {
-	// If a the prevClosure is nil then an aggragate one is created and used
+	// If a the prevClosure is nil then an aggregate one is created and used
 	if prevClosure == nil {
 		prevClosure = closure.New()
 	}

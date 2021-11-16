@@ -3,7 +3,7 @@
 // This package handles the parsing of a given *ast.File which represents
 // the content of a Go source file as an Abstract Syntax Tree.
 
-// The only method avaiable from the outside is ParseFuncDecl, ParseGoStmt and ParseCallExpr which
+// The only method available from the outside is ParseFuncDecl, ParseGoStmt and ParseCallExpr which
 // will add to the given FileMetadata argument the data collected from the parsing phases
 package meta
 
@@ -24,14 +24,14 @@ const (
 // ----------------------------------------------------------------------------
 // FuncMetadata
 
-// A FuncMetadata contains the metadata avaiable about a Go function
+// A FuncMetadata contains the metadata available about a Go function
 //
 // A struct containing all the metadata that the algorithm has been able to
 // extrapolate from the function declaration. Only the function declared in the file
 // by the user are evaluated (built-in and external functions are ignored)
 type FuncMetadata struct {
 	Name          string                  // The identifier of the function
-	ChanMeta      map[string]ChanMetadata // The channels avaiable inside the function scope
+	ChanMeta      map[string]ChanMetadata // The channels available inside the function scope
 	InlineArgs    map[string]FuncArg      // The argument of the function to be inlined (Callbacks/Functions or Channels)
 	ScopeAutomata *fsa.FSA                // A graph representing the transition made inside the function body
 }
@@ -58,9 +58,9 @@ func (fm *FuncMetadata) addChannels(newChanMeta ...ChanMetadata) {
 	}
 }
 
-// In order to satify the ast.Visitor interface FuncMetadata implements
+// In order to satisfy the ast.Visitor interface FuncMetadata implements
 // the Visit() method with this function signature. The Visit method takes as
-// only argument an ast.Node interface and evaluates all the meaninggul cases,
+// only argument an ast.Node interface and evaluates all the meaningful cases,
 // when the function steps into that it tries to extract metada from the subtree
 func (fm FuncMetadata) Visit(node ast.Node) ast.Visitor {
 	// Skips empty nodes during descend
@@ -109,7 +109,7 @@ func (fm FuncMetadata) Visit(node ast.Node) ast.Visitor {
 		parseSendStmt(stmt, &fm)
 		return nil
 
-	// Statement for binary or unary expression (channel recv, fucntion call)
+	// Statement for binary or unary expression (channel recv, function call)
 	case *ast.ExprStmt:
 		parseExprStmt(stmt, &fm)
 		return nil
@@ -147,7 +147,7 @@ func parseFuncDecl(stmt *ast.FuncDecl) FuncMetadata {
 	}
 
 	// If the current is an external (non Go) function then is skipped since
-	// it isn't useful in order to evaluate the choreography of the automa
+	// it isn't useful in order to evaluate the choreography of the automon
 	if stmt.Body == nil {
 		return FuncMetadata{} // Returns zero value of the struct
 	}
@@ -190,7 +190,7 @@ func parseGoStmt(stmt *ast.GoStmt, fm *FuncMetadata) {
 	funcIdent, isFuncIdent := stmt.Call.Fun.(*ast.Ident)
 	_, isFuncAnonymous := stmt.Call.Fun.(*ast.FuncLit)
 
-	// Then extracts the data accoringly
+	// Then extracts the data accordingly
 	if isFuncIdent {
 		tSpawn := fsa.Transition{Move: fsa.Spawn, Label: funcIdent.Name}
 		fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tSpawn)
@@ -198,7 +198,7 @@ func parseGoStmt(stmt *ast.GoStmt, fm *FuncMetadata) {
 		anonFuncName := fmt.Sprintf("%s-%s", anonymousFunc, fm.Name)
 		tSpawn := fsa.Transition{Move: fsa.Spawn, Label: anonFuncName}
 		fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tSpawn)
-		// ? Add parent avaiableChan
+		// ? Add parent availableChan
 		// ? Add parse arguments (different from above)
 		// ? Should parse body of funcLiteral (?)
 	}

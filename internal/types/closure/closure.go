@@ -3,7 +3,7 @@
 // This package implements a Closure (Closure) data structure and its own API.
 // For this specific use cases the implementation is quite simple & basic
 
-// The only method avaiable from the outside are Closure and its API
+// The only method available from the outside are Closure and its API
 package closure
 
 import (
@@ -19,7 +19,7 @@ var latestId int = 0
 // Closure is an implementation of a Set using the builtin map type.
 type Closure struct {
 	Id    int               // The UID of the closure
-	items map[int]fsa.State // A map that defines wich element belong to the closure and which do not
+	items map[int]fsa.State // A map that defines which element belong to the closure and which do not
 }
 
 // Add will add the provided items to the closure.
@@ -73,7 +73,7 @@ func (closure *Closure) IsEqual(other *Closure) bool {
 	return true
 }
 
-// Iteator will return a list of the fsa.State in the closure.
+// Iterator will return a list of the fsa.State in the closure.
 func (closure *Closure) Iterator() []fsa.State {
 	flattened := make([]fsa.State, 0, len(closure.items))
 	for _, item := range closure.items {
@@ -82,7 +82,7 @@ func (closure *Closure) Iterator() []fsa.State {
 	return flattened
 }
 
-// Iteator will return a list of possible fsa.Transition possible from the closure.
+// Iterator will return a list of possible fsa.Transition possible from the closure.
 func (closure *Closure) TransitionIterator() []fsa.Transition {
 	list := []fsa.Transition{}
 	for _, state := range closure.items {
