@@ -11,7 +11,7 @@ import (
 	"log"
 
 	"github.com/goccy/go-graphviz"
-	"github.com/its-hmny/Choreia/internal/types/fsa"
+	"github.com/its-hmny/Choreia/internal/data_structures/fsa"
 )
 
 var latestId int = 0

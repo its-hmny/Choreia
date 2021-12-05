@@ -13,9 +13,9 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/its-hmny/Choreia/internal/data_structures/closure"
+	"github.com/its-hmny/Choreia/internal/data_structures/fsa"
 	"github.com/its-hmny/Choreia/internal/meta"
-	"github.com/its-hmny/Choreia/internal/types/closure"
-	"github.com/its-hmny/Choreia/internal/types/fsa"
 )
 
 // This function extracts from the given function metadata a Projection DCA that

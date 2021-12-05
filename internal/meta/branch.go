@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"go/ast"
 
-	"github.com/its-hmny/Choreia/internal/types/fsa"
+	"github.com/its-hmny/Choreia/internal/data_structures/fsa"
 )
 
 // ----------------------------------------------------------------------------

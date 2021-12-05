@@ -14,8 +14,8 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/its-hmny/Choreia/internal/data_structures/fsa"
 	"github.com/its-hmny/Choreia/internal/meta"
-	"github.com/its-hmny/Choreia/internal/types/fsa"
 )
 
 // TODO comment
