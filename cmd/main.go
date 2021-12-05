@@ -15,7 +15,7 @@ import (
 	// Choreia internal static analysis and metatdata extraction module
 	static_analysis "github.com/its-hmny/Choreia/internal/static_analysis"
 	// Choreia internal Choreography Automata transformation module
-	"github.com/its-hmny/Choreia/internal/automata"
+	transforms "github.com/its-hmny/Choreia/internal/transforms"
 )
 
 func main() {
@@ -61,7 +61,7 @@ func main() {
 	fmt.Println("\t\t------------------------- CDA DEBUG PRINT -------------------------")
 
 	// Uses the metadata to generate a Deterministic Choreography Automata (DCA)
-	automata.GenerateDCA(fileMetadata)
+	transforms.GenerateDCA(fileMetadata)
 
 	// // ! Debugging export as SVG of the graphs
 	// for name, meta := range fileMetadata.FunctionMeta {
