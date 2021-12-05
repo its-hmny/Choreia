@@ -15,7 +15,7 @@ import (
 
 	"github.com/its-hmny/Choreia/internal/data_structures/closure"
 	"github.com/its-hmny/Choreia/internal/data_structures/fsa"
-	"github.com/its-hmny/Choreia/internal/meta"
+	sa "github.com/its-hmny/Choreia/internal/static_analysis"
 )
 
 // This function extracts from the given function metadata a Projection DCA that
@@ -23,7 +23,7 @@ import (
 // function call itself recursively generating more Projection DCAs for the spawned GoRoutine.
 // NOTE: This function should be called with the metadata of a function that is the entrypoint of one
 // or more GoRoutine (the function called on a the spawned routine).
-func extractProjectionDCAs(funcMeta meta.FuncMetadata, fileMeta meta.FileMetadata) []*fsa.FSA {
+func extractProjectionDCAs(funcMeta sa.FuncMetadata, fileMeta sa.FileMetadata) []*fsa.FSA {
 	// Makes a full independent copy of the ScopeAutomata
 	localCopy := funcMeta.ScopeAutomata.Copy()
 	// List of Projection DCA extracted from the current recursive call,
@@ -76,9 +76,9 @@ func extractProjectionDCAs(funcMeta meta.FuncMetadata, fileMeta meta.FileMetadat
 // Expands meaningful (Channel e Function/Callback) positional argument with the actual ones so that any
 // Transition reference the actual channel at runtime. The function uses the offset of the arguments
 // and their types to determine which positional argument has to be replaced with the "actual" ones
-func expandActualArgs(t fsa.Transition, calleeMeta meta.FuncMetadata) *fsa.FSA {
+func expandActualArgs(t fsa.Transition, calleeMeta sa.FuncMetadata) *fsa.FSA {
 	localCopy := calleeMeta.ScopeAutomata.Copy()
-	expandArgs, isList := t.Payload.([]meta.FuncArg)
+	expandArgs, isList := t.Payload.([]sa.FuncArg)
 
 	// Bails out at the first discrepancy returning a non-expanded copy
 	if !isList || len(expandArgs) <= 0 || len(calleeMeta.InlineArgs) <= 0 {
@@ -96,7 +96,7 @@ func expandActualArgs(t fsa.Transition, calleeMeta meta.FuncMetadata) *fsa.FSA {
 			// positional argument are replaced with transition to the actual argument
 			for _, state := range localCopy.StateIterator() {
 				for destId, t := range state.TransitionIterator() {
-					if funcArg.Type == meta.Channel && (t.Move == fsa.Recv || t.Move == fsa.Send) {
+					if funcArg.Type == sa.Channel && (t.Move == fsa.Recv || t.Move == fsa.Send) {
 						// Overrides the older transition with additional data
 						t.Label = actualArg.Name
 						localCopy.AddTransition(state.Id, destId, t)

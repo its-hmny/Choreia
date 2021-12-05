@@ -12,8 +12,8 @@ import (
 
 	"github.com/pborman/getopt/v2"
 
-	// Choreia internal metatdata extraction module
-	"github.com/its-hmny/Choreia/internal/meta"
+	// Choreia internal static analysis and metatdata extraction module
+	static_analysis "github.com/its-hmny/Choreia/internal/static_analysis"
 	// Choreia internal Choreography Automata transformation module
 	"github.com/its-hmny/Choreia/internal/automata"
 )
@@ -46,16 +46,16 @@ func main() {
 	fmt.Println("\t\t---------------------- PARSER DEBUG PRINT ----------------------")
 
 	// Default level for trace option while parsing the file
-	traceOpts := meta.NoTrace
+	traceOpts := static_analysis.NoTrace
 	// If the extended mode is enabled, it overrides the basic mode
 	if traceFlag != nil && *traceFlag {
-		traceOpts = meta.BasicTrace
+		traceOpts = static_analysis.BasicTrace
 	} else if extTraceFlag != nil && *extTraceFlag {
-		traceOpts = meta.ExtendedTrace
+		traceOpts = static_analysis.ExtendedTrace
 	}
 
 	// Parses and extracts the metadata from the given file
-	fileMetadata := meta.ExtractMetadata(*inputFile, traceOpts)
+	fileMetadata := static_analysis.ExtractMetadata(*inputFile, traceOpts)
 
 	// ! From here on is all a work in progress
 	fmt.Println("\t\t------------------------- CDA DEBUG PRINT -------------------------")

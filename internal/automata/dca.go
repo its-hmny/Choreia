@@ -15,13 +15,13 @@ import (
 	"log"
 
 	"github.com/its-hmny/Choreia/internal/data_structures/fsa"
-	"github.com/its-hmny/Choreia/internal/meta"
+	sa "github.com/its-hmny/Choreia/internal/static_analysis"
 )
 
 // TODO comment
 // TODO comment
 // TODO comment
-func GenerateDCA(fileMeta meta.FileMetadata) *fsa.FSA {
+func GenerateDCA(fileMeta sa.FileMetadata) *fsa.FSA {
 	mainFuncMeta, exist := fileMeta.FunctionMeta["main"]
 
 	if !exist {
