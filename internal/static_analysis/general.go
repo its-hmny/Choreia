@@ -6,7 +6,7 @@
 // The only method available from the outside is ParseAssignStmt and ParseExprStmt,
 // both are two generic statement in which multiple interesting thing can occur
 // and this method acts as "orchestrator" of their specialized counterparts
-package meta
+package static_analysis
 
 import (
 	"go/ast"

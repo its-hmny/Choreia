@@ -8,20 +8,20 @@
 // (Deterministic Choreography Automaton). Such transformations could be extracting
 // the DCAs from given metadata or merging two or more Partial/Projection DCAs in one
 // unified DCAs that represents the Choreography as a whole.
-package automata
+package transforms
 
 import (
 	"fmt"
 	"log"
 
 	"github.com/its-hmny/Choreia/internal/data_structures/fsa"
-	sa "github.com/its-hmny/Choreia/internal/static_analysis"
+	meta "github.com/its-hmny/Choreia/internal/static_analysis"
 )
 
 // TODO comment
 // TODO comment
 // TODO comment
-func GenerateDCA(fileMeta sa.FileMetadata) *fsa.FSA {
+func GenerateDCA(fileMeta meta.FileMetadata) *fsa.FSA {
 	mainFuncMeta, exist := fileMeta.FunctionMeta["main"]
 
 	if !exist {

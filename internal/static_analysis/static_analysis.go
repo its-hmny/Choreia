@@ -5,7 +5,7 @@
 
 // The only method available from the outside is ExtractMetadata which is the only entrypoint
 // of the module and will return a FileMetadata struct containing some info bout provided file.
-package meta
+package static_analysis
 
 import (
 	"fmt"

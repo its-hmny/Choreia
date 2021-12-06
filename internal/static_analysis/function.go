@@ -5,7 +5,7 @@
 
 // The only method available from the outside is ParseFuncDecl, ParseGoStmt and ParseCallExpr which
 // will add to the given FileMetadata argument the data collected from the parsing phases
-package meta
+package static_analysis
 
 import (
 	"fmt"

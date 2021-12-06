@@ -13,9 +13,9 @@ import (
 	"github.com/pborman/getopt/v2"
 
 	// Choreia internal static analysis and metatdata extraction module
-	static_analysis "github.com/its-hmny/Choreia/internal/static_analysis"
+	"github.com/its-hmny/Choreia/internal/static_analysis"
 	// Choreia internal Choreography Automata transformation module
-	transforms "github.com/its-hmny/Choreia/internal/transforms"
+	"github.com/its-hmny/Choreia/internal/transforms"
 )
 
 func main() {

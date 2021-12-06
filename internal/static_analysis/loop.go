@@ -5,7 +5,7 @@
 
 // The only method available from the outside is ParseForStmt and ParseRangeStmt which will add to the
 // given FileMetadata argument the data collected from the parsing of the respective constructs
-package meta
+package static_analysis
 
 import (
 	"go/ast"

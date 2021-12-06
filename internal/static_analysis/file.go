@@ -5,7 +5,7 @@
 
 // The only method available from the outside is ParseFile which, as the name suggest, will return
 // a FileMetadata struct containing some info needed by the caller for further uses.
-package meta
+package static_analysis
 
 import (
 	"fmt"
