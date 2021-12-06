@@ -35,40 +35,42 @@ type FSA struct {
 }
 
 type State struct {
-	Id         int                // The id of the current state
-	transition map[int]Transition // A map to other stateId the Transition data
+	Id         int                  // The id of the current state
+	IsFinal    bool                 // Flag to indicate that a state si final/accepting
+	transition map[int][]Transition // A map to other stateId the Transition data
 }
 
 // This function generates a new FSA and returns a pointer reference to it
 func New() *FSA {
 	return &FSA{
 		currentId: 0,
-		states: []State{
-			// Every FSA has already the first (0) state inside
-			{Id: 0, transition: make(map[int]Transition)},
-		},
+		// Every FSA has already the first (0) state inside
+		states: []State{{Id: 0, IsFinal: false, transition: make(map[int][]Transition)}},
 	}
 }
 
 // This function generates an independent copy of the given FSA and returns it
 func (original *FSA) Copy() *FSA {
-	copy := FSA{
+	fsaCopy := FSA{
 		currentId: original.currentId,
 		states:    make([]State, 0, len(original.states)),
 	}
 
 	for _, currentState := range original.states {
 		// Creates a new map, overriding the copied one (since map instance remains intertwined)
-		currentState.transition = make(map[int]Transition)
+		currentState.transition = make(map[int][]Transition)
 		// Copies all the entry of the other map into the decoupled one
-		for dest, t := range original.states[currentState.Id].transition {
-			currentState.transition[dest] = t
+		for dest, destTransitions := range original.states[currentState.Id].transition {
+			tCopy := make([]Transition, len(destTransitions))
+			copy(tCopy, destTransitions)
+			currentState.transition[dest] = tCopy
 		}
+
 		// Then adds the fully copied state to the copy FSA
-		copy.states = append(copy.states, currentState)
+		fsaCopy.states = append(fsaCopy.states, currentState)
 	}
 
-	return &copy
+	return &fsaCopy
 }
 
 // Returns the latest generated id
@@ -86,14 +88,7 @@ func (fsa *FSA) SetRootId(newRootId int) {
 
 // Returns the id of the final state, if such state is not present returns Unknown
 func (fsa *FSA) GetFinalStateId() int {
-	for _, currentState := range fsa.states {
-		// The final state is the one for which there aren't any outcoming transitions
-		if len(currentState.transition) == 0 {
-			return currentState.Id
-		}
-	}
-
-	return Unknown
+	return 0 // TODO REDO COMPLETELY
 }
 
 // Returns the state identified by the given id,if not found returns error
@@ -108,7 +103,8 @@ func (fsa *FSA) newState() (id int) {
 	id = len(fsa.states) // Generates a new id
 	fsa.states = append(fsa.states, State{
 		Id:         id,
-		transition: make(map[int]Transition),
+		IsFinal:    false,
+		transition: make(map[int][]Transition),
 	})
 	return id
 }
@@ -143,49 +139,19 @@ func (fsa *FSA) AddTransition(from, to int, t Transition) {
 	fmt.Printf("BP__ %d -> %d \t %+v\n", from, to, t)
 
 	// Creates/assign the new transition
-	fsa.states[from].transition[to] = t
+	localCopy := fsa.states[from].transition[to]
+	fsa.states[from].transition[to] = append(localCopy, t)
 }
 
-// This function expands a graph in place of an transition. Since in our case every
-// Automata/Graph has only one initial and final state then we simply copy the other graph
-// state by state and transition by transition and then we link the copy to the "from" and "to" states
-func (fsa *FSA) ExpandInPlace(from, to int, other FSA) {
-	// First of all remove the old call transition (since it will be expanded)
-	delete(fsa.states[from].transition, to)
-	// Calculate the offset from which the ids of the "other" will be padded with
-	offset := len(fsa.states)
-
-	// Copies the "other" graph state, applying the offset to each id
-	for _, cpState := range other.states {
-		// Creates a new transition map for and copies all the transitions to it
-		newStateTrans := make(map[int]Transition)
-		for dest, t := range cpState.transition {
-			newDest := offset + dest
-			newStateTrans[newDest] = t
+// TODO COMMENT
+func (fsa *FSA) ForEachTransition(callback func(from, to int, t Transition)) {
+	for _, fromState := range fsa.states {
+		for destState, transitions := range fromState.transition {
+			for _, t := range transitions {
+				callback(fromState.Id, destState, t)
+			}
 		}
-		// Then creates a new state and adds it to the destination graph
-		newState := State{Id: offset + cpState.Id, transition: newStateTrans}
-		fsa.states = append(fsa.states, newState)
 	}
-
-	// Eps transition to mark/link the start of the expanded/copied graph
-	tExpansionStart := Transition{Move: Eps, Label: "start-call-expansion"}
-	tExpansionEnd := Transition{Move: Eps, Label: "end-call-expansion"}
-	// Initial and final state of the freshly copied graph
-	copyInitialStateId, copyFinalStateId := offset, other.GetFinalStateId()+offset
-	// The "linking" transition are now added to the graph, completing the expansion
-	fsa.AddTransition(from, copyInitialStateId, tExpansionStart)
-	fsa.AddTransition(copyFinalStateId, to, tExpansionEnd)
-}
-
-// Returns an iterable representation of the outcoming transition for the given State
-func (s *State) TransitionIterator() map[int]Transition {
-	return s.transition
-}
-
-// Returns an iterable representation of the states for the given Graph
-func (fsa *FSA) StateIterator() []State {
-	return fsa.states
 }
 
 // This function exports a .png image of the current state of the Graph, it copies state by state
@@ -218,12 +184,14 @@ func (fsa *FSA) ExportAsSVG(imagePath string) {
 
 	// Bulk copy of the FSA's Transition into renderGraph
 	for _, state := range fsa.states {
-		for destId, transition := range state.transition {
-			from := associationMap[state.Id]
-			to := associationMap[destId]
-			edgeId := fmt.Sprintf("%d-%d", state.Id, destId)
-			renderEdge, _ := graphRender.CreateEdge(edgeId, from, to)
-			renderEdge.SetLabel(fmt.Sprint(transition))
+		for destId, transitions := range state.transition {
+			for i, t := range transitions {
+				from := associationMap[state.Id]
+				to := associationMap[destId]
+				edgeId := fmt.Sprintf("%d-%d-%d", state.Id, destId, i)
+				renderEdge, _ := graphRender.CreateEdge(edgeId, from, to)
+				renderEdge.SetLabel(fmt.Sprint(t))
+			}
 		}
 	}
 
