@@ -94,6 +94,30 @@ func (fsa *FSA) AddTransition(from, to int, t Transition) {
 	fsa.transitions[from][to] = append(fsa.transitions[from][to], t)
 }
 
+// Removes a transition from and to the specified states with a matching move and label
+func (fsa *FSA) RemoveTransition(from, to int, t Transition) {
+	// Argument checks
+	if from == Unknown || to == Unknown {
+		log.Fatal("unknown starting or ending state on AddTransition")
+	} else if t.Label == "" {
+		log.Fatal("empty labels are not allowed")
+	}
+
+	// Retrieves the current transition list and creates a new one
+	oldList := fsa.transitions[from][to]
+	newList := make([]Transition, 0, len(oldList))
+
+	// Puts all the non matching transition in the new list, filtering out the matching one
+	for _, transition := range oldList {
+		if t.Label != transition.Label && t.Move != transition.Move {
+			newList = append(newList, transition)
+		}
+	}
+
+	// Inserts the new (filtered) list back to the adjacency matrix
+	fsa.transitions[from][to] = newList
+}
+
 // Returns the id of the state last generated
 func (fsa *FSA) GetLastId() int {
 	return len(fsa.transitions) - 1

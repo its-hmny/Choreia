@@ -1,13 +1,8 @@
 // Copyright Enea Guidi (hmny).
 
-// This package handles the extraction of Partial Nondeterministic Automaton from
-// metadata extracted and the handling and subsequent transformation of abovesaid
-// NCA until a single Deterministic Choreography Automata is obtained by them
+// TODO COMMENT
 
-// This module defines some helper function to transform and work with DCAs
-// (Deterministic Choreography Automaton). Such transformations could be extracting
-// the DCAs from given metadata or merging two or more Partial/Projection DCAs in one
-// unified DCAs that represents the Choreography as a whole.
+// TODO COMMENT
 package transforms
 
 import (
@@ -30,7 +25,7 @@ func GenerateDCA(fileMeta meta.FileMetadata) *fsa.FSA {
 
 	// Extracts recursively from the metadata the Projection DCAs, each one of them
 	// will be a projection of the final one but it has lost all of his eps-transition
-	projectionDCAs := extractProjectionDCAs(mainFuncMeta, fileMeta)
+	projectionDCAs := getProjectionAutomata(mainFuncMeta, fileMeta)
 
 	// ! Debug print, will be removed
 	fmt.Printf("Successfully extracted %d Projection NCAs\n", len(projectionDCAs))
