@@ -79,6 +79,7 @@ func (fsa *FSA) AddTransition(from, to int, t Transition) {
 	// If the user specified the "Current" flag the starting state used is the latest created
 	if from == Current {
 		from = fsa.currentId
+
 	}
 
 	// If the user specified the "NewState" flag the destination state is created from scratch
@@ -87,8 +88,10 @@ func (fsa *FSA) AddTransition(from, to int, t Transition) {
 		fsa.SetRootId(to)
 	}
 
-	// ! Debug print, will be removed later
-	fmt.Printf("BP__ %d -> %d \t %+v\n", from, to, t)
+	// If the second map is nil is created just before using it
+	if fsa.transitions[from] == nil {
+		fsa.transitions[from] = make(map[int][]Transition)
+	}
 
 	// Adds the new transition to the adjacency matrix
 	fsa.transitions[from][to] = append(fsa.transitions[from][to], t)

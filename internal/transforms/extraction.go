@@ -15,12 +15,16 @@ import (
 	meta "github.com/its-hmny/Choreia/internal/static_analysis"
 )
 
+var nProjectionExtracted = 0
+
+// -------------------------------------------------------------------------------------------
+// ProjectionAutomata
+
+// A FSA that represents the execution flow of a single Goroutine (identified by its own name)
 type ProjectionAutomata struct {
 	name     string   // An identifier for the Automata
 	automata *fsa.FSA // The FSA itself
 }
-
-var nProjectionExtracted = 0
 
 // Extracts the Projection (or Local) Choreography Automata for the given FuncMeta. The ScopeAutomata of
 // said function is used as entry point of the Projection CA. Every call to another function is expanded inline
@@ -48,7 +52,7 @@ func getProjectionAutomata(function meta.FuncMetadata, file meta.FileMetadata) [
 		}
 	})
 
-	// Get deterministic form of current.automata
+	extractedList[0].automata = subsetConstruction(current.automata)
 	return extractedList
 }
 
