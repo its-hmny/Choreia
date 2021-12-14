@@ -34,15 +34,15 @@ type ProjectionAutomata struct {
 func getProjectionAutomata(function meta.FuncMetadata, file meta.FileMetadata) []ProjectionAutomata {
 	// Creates the Projection Automata for the current GoRoutine
 	current := ProjectionAutomata{
-		name:     fmt.Sprintf("%s (%d)", function.Name, nProjectionExtracted),
+		name:     fmt.Sprintf("Goroutine %d (%s)", nProjectionExtracted, function.Name),
 		automata: function.ScopeAutomata.Copy(), // Makes a full independent copy of the funcMeta.ScopeAutomata
 	}
 
 	nProjectionExtracted++
 	extractedList := []ProjectionAutomata{current}
 
-	// Iterates over each transition in the ScopeAutomata copy
-	current.automata.ForEachTransition(func(from, to int, t fsa.Transition) {
+	// Iterates over each transition in the ScopeAutomata
+	function.ScopeAutomata.ForEachTransition(func(from, to int, t fsa.Transition) {
 		switch t.Move {
 		case fsa.Call:
 			inlineCallTransition(file, current.automata, from, to, t)
@@ -76,7 +76,7 @@ func inlineCallTransition(file meta.FileMetadata, root *fsa.FSA, from, to int, t
 	// by the caller (Find and Replace over the called ScopeAutomata) then inline the called ScopeAutomata
 	// into the root one
 	calledScopeAutomata := replaceActualArgs(t, calledFunc)
-	inlineAutomata(root, from, to, t, *calledScopeAutomata)
+	inlineAutomata(root, from, to, t, calledScopeAutomata)
 }
 
 // TODO Comment
@@ -152,7 +152,7 @@ func replaceActualArgs(t fsa.Transition, calledFunc meta.FuncMetadata) *fsa.FSA 
 // Automata/Graph has only one initial and final state then we simply copy the other graph
 // state by state and transition by transition and then we link the copy to the "from" and "to" states
 // TODO COMMENTS
-func inlineAutomata(root *fsa.FSA, from, to int, t fsa.Transition, other fsa.FSA) {
+func inlineAutomata(root *fsa.FSA, from, to int, t fsa.Transition, other *fsa.FSA) {
 	// First of all remove the old call transition
 	root.RemoveTransition(from, to, t)
 

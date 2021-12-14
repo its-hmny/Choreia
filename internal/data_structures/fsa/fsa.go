@@ -11,6 +11,7 @@ import (
 	"log"
 
 	list "github.com/emirpasic/gods/lists/singlylinkedlist"
+	set "github.com/emirpasic/gods/sets/hashset"
 	"github.com/goccy/go-graphviz"
 	"github.com/goccy/go-graphviz/cgraph"
 )
@@ -41,7 +42,8 @@ func New() *FSA {
 	newFsa := FSA{
 		currentId:   0,
 		FinalStates: list.New(),
-		transitions: make(map[int]map[int][]Transition),
+		// A FSA has always an initial state
+		transitions: map[int]map[int][]Transition{0: nil},
 	}
 
 	return &newFsa
@@ -53,7 +55,7 @@ func (original *FSA) Copy() *FSA {
 		currentId: original.currentId,
 		// TODO DOES IT COPIES
 		FinalStates: original.FinalStates, // Dereferences the list forcing a copy on the object
-		transitions: make(map[int]map[int][]Transition),
+		transitions: map[int]map[int][]Transition{0: nil},
 	}
 
 	// Iterates over the transition in the original FSA, copying them one by one
@@ -117,13 +119,27 @@ func (fsa *FSA) RemoveTransition(from, to int, t Transition) {
 		}
 	}
 
-	// Inserts the new (filtered) list back to the adjacency matrix
-	fsa.transitions[from][to] = newList
+	if len(newList) > 0 {
+		// Inserts the new (filtered) list back to the adjacency matrix
+		fsa.transitions[from][to] = newList
+	} else {
+		delete(fsa.transitions[from], to)
+	}
 }
 
 // Returns the id of the state last generated
 func (fsa *FSA) GetLastId() int {
-	return len(fsa.transitions) - 1
+	stateSet := set.New()
+
+	// Populates the state set (duplicate issue are avoided)
+	for from, outgoing := range fsa.transitions {
+		stateSet.Add(from)
+		for to := range outgoing {
+			stateSet.Add(to)
+		}
+	}
+
+	return stateSet.Size() - 1
 }
 
 // Sets the state identified by the given id as the new root of the FSA, this means that the next
@@ -147,6 +163,24 @@ func (fsa *FSA) ForEachTransition(callback func(from, to int, t Transition)) {
 	}
 }
 
+// Allows to iterate over each states currently available in the FSA with a user defined callback
+func (fsa *FSA) ForEachState(callback func(id int)) {
+	stateSet := set.New()
+
+	// Populates the state set (duplicate issue are avoided)
+	for from, outgoing := range fsa.transitions {
+		stateSet.Add(from)
+		for to := range outgoing {
+			stateSet.Add(to)
+		}
+	}
+
+	// Iterate on the set with only unique values
+	for stateId := range stateSet.Values() {
+		callback(stateId)
+	}
+}
+
 // Exports the FSA in the format requested, creating/overwriting the path given as argument
 func (fsa *FSA) Export(outputFile string, format graphviz.Format) {
 	// Creates a GraphViz instance and initializes a Graph render object
@@ -161,7 +195,7 @@ func (fsa *FSA) Export(outputFile string, format graphviz.Format) {
 	state2node := make(map[int]*cgraph.Node)
 
 	// Bulk copy of states from the FSA to the graphviz Graph (as nodes)
-	for stateId := range fsa.transitions {
+	fsa.ForEachState(func(stateId int) {
 		// Creates a cgraph.Node from the current stateId
 		node, nodeErr := graph.CreateNode(fmt.Sprint(stateId))
 		node.SetShape(cgraph.CircleShape) // Default shape
@@ -177,7 +211,7 @@ func (fsa *FSA) Export(outputFile string, format graphviz.Format) {
 
 		// At last updates the association map with the new entries
 		state2node[stateId] = node
-	}
+	})
 
 	// Bulk copy of transitions from the FSA to the graphviz Graph (as edges)
 	fsa.ForEachTransition(func(from, to int, t Transition) {

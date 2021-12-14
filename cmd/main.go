@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/goccy/go-graphviz"
 	"github.com/pborman/getopt/v2"
 
 	// Choreia internal static analysis and metatdata extraction module
@@ -56,6 +57,11 @@ func main() {
 
 	// Parses and extracts the metadata from the given file
 	fileMetadata := static_analysis.ExtractMetadata(*inputFile, traceOpts)
+
+	for _, funcMeta := range fileMetadata.FunctionMeta {
+		filename := fmt.Sprintf("debug/%s.svg", funcMeta.Name)
+		funcMeta.ScopeAutomata.Export(filename, graphviz.SVG)
+	}
 
 	// ! From here on is all a work in progress
 	fmt.Println("\t\t------------------------- CDA DEBUG PRINT -------------------------")

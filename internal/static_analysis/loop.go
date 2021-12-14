@@ -62,6 +62,9 @@ func parseRangeStmt(stmt *ast.RangeStmt, fm *FuncMetadata) {
 		}
 	}
 
+	// Saves a local copy of the current id, all the branch will fork from it
+	forkStateId := fm.ScopeAutomata.GetLastId()
+
 	// Generate an eps-transition to represent the fork/branch (the iteration block in the loop)
 	// and add it as a transaction, if we're using range on a channel then the transition became
 	// a Recv transition since on channel this is the default overload of "range" keyword
@@ -73,8 +76,6 @@ func parseRangeStmt(stmt *ast.RangeStmt, fm *FuncMetadata) {
 		fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tEpsStart)
 	}
 
-	// Saves a local copy of the current id, all the branch will fork from it
-	forkStateId := fm.ScopeAutomata.GetLastId()
 	// Parses the nested block
 	ast.Walk(fm, stmt.Body)
 
