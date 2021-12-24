@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"log"
 
-	set "github.com/emirpasic/gods/sets/hashset"
-
 	"github.com/its-hmny/Choreia/internal/data_structures/fsa"
 	meta "github.com/its-hmny/Choreia/internal/static_analysis"
 )
@@ -22,8 +20,8 @@ var nProjectionExtracted = 0
 
 // A FSA that represents the execution flow of a single Goroutine (identified by its own name)
 type ProjectionAutomata struct {
-	name     string   // An identifier for the Automata
-	automata *fsa.FSA // The FSA itself
+	Name     string   // An identifier for the Automata
+	Automata *fsa.FSA // The FSA itself
 }
 
 // Extracts the Projection (or Local) Choreography Automata for the given FuncMeta. The ScopeAutomata of
@@ -31,11 +29,11 @@ type ProjectionAutomata struct {
 // in Local Automata (channel and callbacks passed as argument are expanded as well). When a new GoRoutine is
 // spawned during the execution flow a new Local Automata is generated. All the CA are transformed to a
 // deterministic version with the Subset Construction Algorithm
-func getProjectionAutomata(function meta.FuncMetadata, file meta.FileMetadata) []ProjectionAutomata {
+func GetLocalViews(function meta.FuncMetadata, file meta.FileMetadata) []ProjectionAutomata {
 	// Creates the Projection Automata for the current GoRoutine
 	current := ProjectionAutomata{
-		name:     fmt.Sprintf("Goroutine %d (%s)", nProjectionExtracted, function.Name),
-		automata: function.ScopeAutomata.Copy(), // Makes a full independent copy of the funcMeta.ScopeAutomata
+		Name:     fmt.Sprintf("Goroutine %d (%s)", nProjectionExtracted, function.Name),
+		Automata: function.ScopeAutomata.Copy(), // Makes a full independent copy of the funcMeta.ScopeAutomata
 	}
 
 	nProjectionExtracted++
@@ -45,14 +43,14 @@ func getProjectionAutomata(function meta.FuncMetadata, file meta.FileMetadata) [
 	function.ScopeAutomata.ForEachTransition(func(from, to int, t fsa.Transition) {
 		switch t.Move {
 		case fsa.Call:
-			inlineCallTransition(file, current.automata, from, to, t)
+			inlineCallTransition(file, current.Automata, from, to, t)
 		case fsa.Spawn:
-			newLocalAutomata := extractSpawnTransition(file, current.automata, from, to, t)
+			newLocalAutomata := extractSpawnTransition(file, current.Automata, from, to, t)
 			extractedList = append(extractedList, newLocalAutomata...)
 		}
 	})
 
-	extractedList[0].automata = subsetConstruction(current.automata)
+	// extractedList[0].Automata = subsetConstruction(current.Automata)
 	return extractedList
 }
 
@@ -98,7 +96,7 @@ func extractSpawnTransition(file meta.FileMetadata, root *fsa.FSA, from, to int,
 	// Recursively call getProjectionAutomata on the spawned GoRoutine entrypoint
 	//(the function called with go keyword), then returns the extracted Projection Automata
 	// the first is always the spawned one, the others can be function spawned by the one spawned by us
-	newLocalAutomata := getProjectionAutomata(calledFunc, file)
+	newLocalAutomata := GetLocalViews(calledFunc, file)
 
 	// Overrides the older transition with additional data (reference to the spawned ProjectionAutomata)
 	newT := fsa.Transition{Move: t.Move, Label: t.Label, Payload: newLocalAutomata[0]}
@@ -157,9 +155,8 @@ func inlineAutomata(root *fsa.FSA, from, to int, t fsa.Transition, other *fsa.FS
 	root.RemoveTransition(from, to, t)
 
 	// Count the number of states, in order to extract an offset
-	stateSet := set.New()
-	root.ForEachTransition(func(_, _ int, _ fsa.Transition) { stateSet.Add(from) })
-	offset := len(stateSet.Values())
+	offset := 0
+	root.ForEachState(func(_ int) { offset++ })
 
 	// Copies the "other" graph state, applying the offset to each id
 	other.ForEachTransition(func(from, to int, t fsa.Transition) {
@@ -171,9 +168,8 @@ func inlineAutomata(root *fsa.FSA, from, to int, t fsa.Transition, other *fsa.FS
 	root.AddTransition(from, offset, tExpansionStart)
 
 	// Links every final/accepting states of the other FSA with the "root" via eps transition
-	listIterator := other.FinalStates.Iterator()
-	for listIterator.Next() {
-		finalStateId := listIterator.Value().(int)
+	for _, item := range other.FinalStates.Values() {
+		finalStateId := item.(int)
 		tExpansionEnd := fsa.Transition{Move: fsa.Eps, Label: "end-call-expansion"}
 		root.AddTransition(finalStateId+offset, to, tExpansionEnd)
 	}

@@ -12,35 +12,10 @@ import (
 	"github.com/its-hmny/Choreia/internal/data_structures/fsa"
 )
 
-// TODO COMMENT
-// TODO COMMENT
-// TODO COMMENT
-func newEpsClosure(automata *fsa.FSA, states *set.Set) *set.Set {
-	// A set to keep track of all the states already reached
-	reachedStates := set.New(states.Values()...)
-
-	automata.ForEachTransition(func(from, to int, t fsa.Transition) {
-		// If the current is a eps transition starting from one of the already reachable states
-		// we add the destination of said transition to the eps closure
-		if t.Move == fsa.Eps && reachedStates.Contains(from) {
-			reachedStates.Add(to)
-		}
-
-	})
-
-	// If we've reached more states than the previous call we search recursively
-	if reachedStates.Size() > states.Size() {
-		return newEpsClosure(automata, reachedStates)
-	}
-
-	// Else we found all the states reachable and we return the full closure
-	return reachedStates
-}
-
 // TODO comment
 // TODO comment
 // TODO comment
-func subsetConstruction(NCA *fsa.FSA) *fsa.FSA {
+func SubsetConstruction(NCA *fsa.FSA) *fsa.FSA {
 	DCA := fsa.New() // The deterministic version of the NCA
 
 	// Initialization of the eps-closure of the first state,
@@ -48,16 +23,15 @@ func subsetConstruction(NCA *fsa.FSA) *fsa.FSA {
 	//Init the tSet (a set of eps-closure)
 	tSet := list.New(initialClosure)
 	// Init the nIteration counter that will be used to iterate over tSet
-	nIteration := 0
 
 	// We use this trick since the range statement uses a "frozen" version of the variable
 	// while we need a "live" value
-	for nIteration < tSet.Size() {
+	for nIteration := 0; nIteration < tSet.Size(); nIteration++ {
 		item, _ := tSet.Get(nIteration) // Extracts the closure to be evaluated
 		closure := item.(*set.Set)
 
 		NCA.ForEachTransition(func(from, to int, t fsa.Transition) {
-			if !closure.Contains(from) { // Skips the transition that don't start from within the closure
+			if !closure.Contains(from) || t.Move == fsa.Eps { // Skips the transition that don't start from within the closure
 				return
 			}
 
@@ -90,11 +64,35 @@ func subsetConstruction(NCA *fsa.FSA) *fsa.FSA {
 				DCA.AddTransition(nIteration, twinIndex, t)
 			}
 		})
-
-		nIteration++
 	}
 
 	return DCA
+}
+
+// TODO COMMENT
+// TODO COMMENT
+// TODO COMMENT
+func newEpsClosure(automata *fsa.FSA, states *set.Set) *set.Set {
+	// A set to keep track of all the states already reached
+	reachedStates := set.New(states.Values()...)
+
+	automata.ForEachTransition(func(from, to int, t fsa.Transition) {
+		// If the current is a eps transition starting from one of the already reachable states
+		// we add the destination of said transition to the eps closure
+		if t.Move == fsa.Eps && reachedStates.Contains(from) {
+			reachedStates.Add(to)
+		}
+
+	})
+
+	// If we've reached more states than the previous call we search recursively
+	if reachedStates.Size() > states.Size() {
+		recursiveEpsClosure := newEpsClosure(automata, reachedStates)
+		reachedStates.Add(recursiveEpsClosure.Values()...)
+	}
+
+	// Else we found all the states reachable and we return the full closure
+	return reachedStates
 }
 
 // TODO comment
