@@ -178,6 +178,12 @@ func parseFuncDecl(stmt *ast.FuncDecl) FuncMetadata {
 	// gather additional information about the stmt in the function scope
 	ast.Walk(metadata, stmt.Body)
 
+	// Adds an eps transition to a new state
+	t := fsa.Transition{Move: fsa.Eps, Label: fmt.Sprintf("func-%s-return", metadata.Name)}
+	metadata.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, t)
+	// The newly created state will be the final state of the ScopeAutomata
+	metadata.ScopeAutomata.FinalStates.Add(metadata.ScopeAutomata.GetLastId())
+
 	// At last all the data extracted is returned
 	return metadata
 }

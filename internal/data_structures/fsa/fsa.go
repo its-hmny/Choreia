@@ -114,17 +114,13 @@ func (fsa *FSA) RemoveTransition(from, to int, t Transition) {
 
 	// Puts all the non matching transition in the new list, filtering out the matching one
 	for _, transition := range oldList {
-		if t.Label != transition.Label && t.Move != transition.Move {
+		if t.Label != transition.Label || t.Move != transition.Move {
 			newList = append(newList, transition)
 		}
 	}
 
-	if len(newList) > 0 {
-		// Inserts the new (filtered) list back to the adjacency matrix
-		fsa.transitions[from][to] = newList
-	} else {
-		delete(fsa.transitions[from], to)
-	}
+	// Inserts the new (filtered) list back to the adjacency matrix
+	fsa.transitions[from][to] = newList
 }
 
 // Returns the id of the state last generated
