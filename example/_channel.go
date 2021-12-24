@@ -29,6 +29,7 @@ func sum(s []int, c chan int) int {
 	accumulator := 0
 	for _, v := range s {
 		accumulator += v
+		c <- accumulator
 	}
 	// Send accumulator to c
 	c <- accumulator

@@ -5,7 +5,7 @@ var channel chan int
 func dummy() {}
 
 func main() {
-	channel = make(chan int)
+	channel = make(int)
 
 	if <-channel; true {
 		dummy()
