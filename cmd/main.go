@@ -43,9 +43,6 @@ func main() {
 	}
 	os.Mkdir("debug", 0775)
 
-	// ! Debug print, will be removed
-	fmt.Println("\t\t---------------------- PARSER DEBUG PRINT ----------------------")
-
 	// Default level for trace option while parsing the file
 	traceOpts := static_analysis.NoTrace
 	// If the extended mode is enabled, it overrides the basic mode
@@ -58,16 +55,35 @@ func main() {
 	// Parses and extracts the metadata from the given file
 	fileMetadata := static_analysis.ExtractMetadata(*inputFile, traceOpts)
 
+	// ! Debug, will be removed
 	for _, funcMeta := range fileMetadata.FunctionMeta {
 		filename := fmt.Sprintf("debug/%s.svg", funcMeta.Name)
 		funcMeta.ScopeAutomata.Export(filename, graphviz.SVG)
 	}
 
-	// ! From here on is all a work in progress
-	fmt.Println("\t\t------------------------- CDA DEBUG PRINT -------------------------")
+	// Retrieves the "main" function metadata
+	mainMeta, exist := fileMetadata.FunctionMeta["main"]
+	if !exist {
+		log.Fatal("Cannot extract Partial Automata, 'main' function metadata not found")
+	}
 
-	// Uses the metadata to generate a Deterministic Choreography Automata (DCA)
-	transforms.GenerateDCA(fileMetadata)
+	// Extracts the local views starting from the program entrypoint ("main" function)
+	localViews := transforms.GetLocalViews(mainMeta, fileMetadata)
+
+	// ! Debug, will be removed
+	for _, lView := range localViews {
+		fmt.Println(lView.Name)
+		// Exports the local view (NFA version)
+		filename := fmt.Sprintf("debug/NFA-%s.svg", lView.Name)
+		lView.Automata.Export(filename, graphviz.SVG)
+
+		// Constructs and exports the local view (DFA version)
+		tmp := fmt.Sprintf("debug/DFA-%s.svg", lView.Name)
+		transforms.SubsetConstruction(lView.Automata).Export(tmp, graphviz.SVG)
+	}
+
+	// TODO Uses the metadata to generate a Deterministic Choreography Automata (DCA)
+	// TODO transforms.GenerateDCA(fileMetadata)
 
 	// // ! Debugging export as SVG of the graphs
 	// for name, meta := range fileMetadata.FunctionMeta {
