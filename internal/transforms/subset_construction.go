@@ -44,10 +44,20 @@ func SubsetConstruction(NCA *fsa.FSA) *fsa.FSA {
 				return
 			}
 
-			// TODO Handle final states in the closure
+			// Checks if at least one state in the closure is a final state then the new
+			// state in the DCA will be final as well
+			// ? MOVE TO OWN FUNCTION
+			containsFinalState := false
+			for _, stateId := range moveEpsClosure.Values() {
+				if NCA.FinalStates.Contains(stateId) {
+					containsFinalState = true
+					break
+				}
+			}
 
 			// If the eps-closure extracted already exist in tSet (has been already disvocered)
 			// then retrieves its twin's id from the map, and use the latter instead of its twin
+			// ? MOVE TO OWN FUNCTION
 			twinIndex, twinId := tSet.Find(func(_ int, item interface{}) bool {
 				c := item.(*set.Set)
 				// Simple tricK: If A is contained in B and viceversa then A equals B
@@ -60,6 +70,10 @@ func SubsetConstruction(NCA *fsa.FSA) *fsa.FSA {
 			if twinId == nil {
 				tSet.Add(moveEpsClosure)
 				DCA.AddTransition(nIteration, fsa.NewState, t)
+				// The new state as to be added to the final state list as well
+				if containsFinalState {
+					DCA.FinalStates.Add(DCA.GetLastId())
+				}
 			} else {
 				DCA.AddTransition(nIteration, twinIndex, t)
 			}

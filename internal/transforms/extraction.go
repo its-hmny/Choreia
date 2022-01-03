@@ -29,7 +29,7 @@ type ProjectionAutomata struct {
 // in Local Automata (channel and callbacks passed as argument are expanded as well). When a new GoRoutine is
 // spawned during the execution flow a new Local Automata is generated. All the CA are transformed to a
 // deterministic version with the Subset Construction Algorithm
-func GetLocalViews(function meta.FuncMetadata, file meta.FileMetadata) []ProjectionAutomata {
+func GetLocalViews(function meta.FuncMetadata, file meta.FileMetadata) []*ProjectionAutomata {
 	// Creates the Projection Automata for the current GoRoutine
 	current := ProjectionAutomata{
 		Name:     fmt.Sprintf("Goroutine %d (%s)", nProjectionExtracted, function.Name),
@@ -37,7 +37,7 @@ func GetLocalViews(function meta.FuncMetadata, file meta.FileMetadata) []Project
 	}
 
 	nProjectionExtracted++
-	extractedList := []ProjectionAutomata{current}
+	extractedList := []*ProjectionAutomata{&current}
 
 	// Iterates over each transition in the ScopeAutomata
 	function.ScopeAutomata.ForEachTransition(func(from, to int, t fsa.Transition) {
@@ -80,7 +80,7 @@ func inlineCallTransition(file meta.FileMetadata, root *fsa.FSA, from, to int, t
 // TODO Comment
 // TODO Comment
 // TODO Comment
-func extractSpawnTransition(file meta.FileMetadata, root *fsa.FSA, from, to int, t fsa.Transition) []ProjectionAutomata {
+func extractSpawnTransition(file meta.FileMetadata, root *fsa.FSA, from, to int, t fsa.Transition) []*ProjectionAutomata {
 	// Tries to retrieve the called function metadata from the file
 	calledFunc, hasMeta := file.FunctionMeta[t.Label]
 
