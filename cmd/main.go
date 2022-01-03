@@ -72,14 +72,19 @@ func main() {
 
 	// ! Debug, will be removed
 	for _, lView := range localViews {
-		fmt.Println(lView.Name)
 		// Exports the local view (NFA version)
 		filename := fmt.Sprintf("debug/NFA-%s.svg", lView.Name)
 		lView.Automata.Export(filename, graphviz.SVG)
 
+		// Determinization of the local view FSA
+		lViewDFA := transforms.SubsetConstruction(lView.Automata)
+
 		// Constructs and exports the local view (DFA version)
 		tmp := fmt.Sprintf("debug/DFA-%s.svg", lView.Name)
-		transforms.SubsetConstruction(lView.Automata).Export(tmp, graphviz.SVG)
+		lViewDFA.Export(tmp, graphviz.SVG)
+
+		// Updates the automata for the local view
+		lView.Automata = lViewDFA.Copy()
 	}
 
 	// TODO Uses the metadata to generate a Deterministic Choreography Automata (DCA)

@@ -8,7 +8,6 @@
 package static_analysis
 
 import (
-	"fmt"
 	"go/ast"
 	"log"
 )
@@ -73,7 +72,6 @@ func (fm FileMetadata) Visit(node ast.Node) ast.Visitor {
 		return nil
 	// Obvoiusly we want to extrapolate data about the declared function (and their action)
 	case *ast.FuncDecl:
-		fmt.Printf("\nParsing function '%s'\n", stmt.Name.Name)
 		newFunction := parseFuncDecl(stmt)
 		fm.addFunctionMeta(newFunction)
 		return nil
