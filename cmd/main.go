@@ -24,8 +24,8 @@ import (
 func main() {
 	// Getopt setup for CLI argument parsing
 	inputFile := getopt.StringLong("input", 'i', "", "The .go file from which extract the Choreography Automata")
+	outputPath := getopt.StringLong("output", 'o', "./choreia.out", "The path to where the extracted data will be saved")
 	traceFlag := getopt.BoolLong("trace", 't', "Pretty prints on the console the AST", "false")
-	extTraceFlag := getopt.BoolLong("ext-trace", 'e', "Pretty prints on the console the expanded AST", "false")
 	showUsage := getopt.BoolLong("help", 'h', "Display this help message", "false")
 	getopt.Parse() // Parses the program arguments
 
@@ -39,31 +39,22 @@ func main() {
 		return
 	}
 
-	// ! Debug, will be removed
-	if _, err := os.Stat("debug"); err == nil {
-		os.RemoveAll("debug")
+	if _, err := os.Stat(*outputPath); err == nil {
+		os.RemoveAll(*outputPath)
 	}
-	os.Mkdir("debug", 0775)
+	os.Mkdir(*outputPath, 0775)
 
 	// Default level for trace option while parsing the file
 	traceOpts := static_analysis.NoTrace
 	// If the extended mode is enabled, it overrides the basic mode
 	if traceFlag != nil && *traceFlag {
-		traceOpts = static_analysis.BasicTrace
-	} else if extTraceFlag != nil && *extTraceFlag {
-		traceOpts = static_analysis.ExtendedTrace
+		traceOpts = static_analysis.Trace
 	}
 
 	// Parses and extracts the metadata from the given file
 	fileMetadata := static_analysis.ExtractMetadata(*inputFile, traceOpts)
 
-	// ! Debug, will be removed
-	for _, funcMeta := range fileMetadata.FunctionMeta {
-		filename := fmt.Sprintf("debug/%s.svg", funcMeta.Name)
-		funcMeta.ScopeAutomata.Export(filename, graphviz.SVG)
-	}
-
-	// Retrieves the "main" function metadata
+	// Retrieves the "main" function metadata (the entrypoint of the "root" Goroutine)
 	mainMeta, exist := fileMetadata.FunctionMeta["main"]
 	if !exist {
 		log.Fatal("Cannot extract Partial Automata, 'main' function metadata not found")
@@ -72,37 +63,25 @@ func main() {
 	// Extracts the local views starting from the program entrypoint ("main" function)
 	localViews := transforms.GetLocalViews(mainMeta, fileMetadata)
 
-	// ! Debug, will be removed
+	// For each local view of the Choreography Automata applies transformations (determinization, minimization)
 	for _, lView := range localViews {
 		// Exports the local view (NFA version)
-		filename := fmt.Sprintf("debug/NFA-%s.svg", lView.Name)
-		lView.Automata.Export(filename, graphviz.SVG)
+		filenameNFA := fmt.Sprintf("%s/NFA-%s.svg", *outputPath, lView.Name)
+		lView.Automata.Export(filenameNFA, graphviz.SVG)
 
 		// Determinization of the local view FSA
 		lViewDFA := transforms.SubsetConstruction(lView.Automata)
 		// TODO: Add minimization of the DFA
 
 		// Constructs and exports the local view (DFA version)
-		tmp := fmt.Sprintf("debug/DFA-%s.svg", lView.Name)
-		lViewDFA.Export(tmp, graphviz.SVG)
+		filenameDFA := fmt.Sprintf("%s/DFA-%s.svg", *outputPath, lView.Name)
+		lViewDFA.Export(filenameDFA, graphviz.SVG)
 
 		// Updates the automata for the local view
 		lView.Automata = lViewDFA.Copy()
 	}
 
-	// TODO Uses the metadata to generate a Deterministic Choreography Automata (DCA)
-	// TODO transforms.GenerateDCA(fileMetadata)
-
-	// // ! Debugging export as SVG of the graphs
-	// for name, meta := range fileMetadata.FunctionMeta {
-	// meta.ScopeAutomata.ExportAsSVG(fmt.Sprintf("debug/%s.svg", name))
-	// }
-
-	//  //  ! Debugging export of the metadata as SVG
-	// fileDump, fileErr := os.Create("debug/file_meta.json")
-	// jsonDump, jsonErr := json.MarshalIndent(fileMetadata, "", "  ")
-	// if jsonErr != nil || fileErr != nil {
-	// log.Fatal("Error encountered while writing JSON metadata file")
-	// }
-	// fileDump.WriteString(string(jsonDump))
+	// At last extracts the Choreography Automata (also known as "global view")
+	finalCA := transforms.GenerateDCA(localViews)
+	finalCA.Export(fmt.Sprintf("%s/Choreography Automata.svg", *outputPath), graphviz.SVG)
 }

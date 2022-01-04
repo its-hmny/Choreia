@@ -9,19 +9,15 @@
 package static_analysis
 
 import (
-	"fmt"
-	"go/ast"
 	"go/parser"
 	"go/token"
 	"log"
 	"os"
-	"strings"
 )
 
 const (
 	NoTrace TraceMode = iota
-	BasicTrace
-	ExtendedTrace
+	Trace
 
 	// parser.ParseFIle default flags, we want all every error possible
 	defaultFlags = parser.DeclarationErrors | parser.AllErrors
@@ -29,19 +25,6 @@ const (
 
 // Simple type alias to wrap trace option definition
 type TraceMode int
-
-// A simple type alias that fullfills the ast.Visitor interface and implements
-// the Visit() function, this will print a trace on the stdin of the structure of the AST
-type traceVisitor int
-
-func (v traceVisitor) Visit(node ast.Node) ast.Visitor {
-	if node == nil {
-		return nil
-	}
-
-	fmt.Printf("%s %T\n", strings.Repeat("  ", int(v)), node)
-	return v + 1
-}
 
 // ----------------------------------------------------------------------------
 // Meta package API
@@ -55,19 +38,18 @@ func ExtractMetadata(filePath string, traceOpts TraceMode) FileMetadata {
 		log.Fatal("A path to an existing go source file is needed")
 	}
 
+	parserFlags := defaultFlags
+
+	// Enable trace during the ast generation
+	if traceOpts == Trace {
+		parserFlags |= parser.Trace
+	}
+
 	// Parses the file and retrieves the AST
-	f, err := parser.ParseFile(token.NewFileSet(), filePath, nil, defaultFlags)
+	f, err := parser.ParseFile(token.NewFileSet(), filePath, nil, parserFlags)
 
 	if err != nil {
 		log.Fatal(err)
-	}
-
-	if traceOpts == BasicTrace {
-		// Descend the AST in depth first order, printing a small trace on the stdin
-		ast.Walk(traceVisitor(0), f)
-	} else if traceOpts == ExtendedTrace {
-		// Parses again the whole file but adds the built-in trace option with more insights
-		parser.ParseFile(token.NewFileSet(), filePath, nil, defaultFlags|parser.Trace)
 	}
 
 	return parseAstFile(f)

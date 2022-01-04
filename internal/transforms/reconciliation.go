@@ -12,11 +12,10 @@ import (
 	"log"
 
 	"github.com/its-hmny/Choreia/internal/data_structures/fsa"
-	meta "github.com/its-hmny/Choreia/internal/static_analysis"
 )
 
 // ! Must be implemented
-func GenerateDCA(fileMeta meta.FileMetadata) *fsa.FSA {
+func GenerateDCA(localViews []*ProjectionAutomata) *fsa.FSA {
 	// Takes the deterministic version of the Partial Automaton and merges them
 	// in one DCA that will represent the choreography as a whole
 	log.Fatalf("GenerateDCA not implemented")
