@@ -1,10 +1,11 @@
-// Copyright Enea Guidi (hmny).
+// Copyright 2020 Enea Guidi (hmny). All rights reserved.
+// This file are distributed under the General Public License v 3.0.
+// A copy of abovesaid license can be found in the LICENSE file.
 
-// This package handles the parsing of a given *ast.File which represents
-// the content of a Go source file as an Abstract Syntax Tree.
-
-// The only method available from the outside is ParseFuncDecl, ParseGoStmt and ParseCallExpr which
-// will add to the given FileMetadata argument the data collected from the parsing phases
+// Package static_analysis declares the types used to represent metedata extracted from the Go source code.
+// The source code is transformed to an Abstract Syntax Tree via go/ast module and. Said AST is visited fully
+// and all the metadata needed are extractred then returned in a single aggregate struct.
+//
 package static_analysis
 
 import (

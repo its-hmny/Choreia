@@ -1,4 +1,6 @@
-// Copyright Enea Guidi (hmny).
+// Copyright 2020 Enea Guidi (hmny). All rights reserved.
+// This file are distributed under the General Public License v 3.0.
+// A copy of abovesaid license can be found in the LICENSE file.
 
 // This package contains the entry point of the whole program, it handles
 // directly all the interaction with its utility module with the final pourpose
@@ -78,6 +80,7 @@ func main() {
 
 		// Determinization of the local view FSA
 		lViewDFA := transforms.SubsetConstruction(lView.Automata)
+		// TODO: Add minimization of the DFA
 
 		// Constructs and exports the local view (DFA version)
 		tmp := fmt.Sprintf("debug/DFA-%s.svg", lView.Name)

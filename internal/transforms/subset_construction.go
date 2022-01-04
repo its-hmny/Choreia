@@ -1,8 +1,11 @@
-// Copyright Enea Guidi (hmny).
+// Copyright 2020 Enea Guidi (hmny). All rights reserved.
+// This file are distributed under the General Public License v 3.0.
+// A copy of abovesaid license can be found in the LICENSE file.
 
-// TODO COMMENT
-
-// TODO comment
+// Package transforms declares the types and functions used to represent and work with
+// ProjectionAutomata (also referenced as Local Views) for a given Goroutine. They also implements
+// general pourpose algorithm for Finite State Automata (FSA) such as Subset Construction Algorithm
+//
 package transforms
 
 import (
@@ -12,9 +15,7 @@ import (
 	"github.com/its-hmny/Choreia/internal/data_structures/fsa"
 )
 
-// TODO comment
-// TODO comment
-// TODO comment
+// An adapted version of the classic Subset Construction Algorithm to transform a NFA to an equivalent DFA
 func SubsetConstruction(NCA *fsa.FSA) *fsa.FSA {
 	DCA := fsa.New() // The deterministic version of the NCA
 
@@ -46,18 +47,13 @@ func SubsetConstruction(NCA *fsa.FSA) *fsa.FSA {
 
 			// Checks if at least one state in the closure is a final state then the new
 			// state in the DCA will be final as well
-			// ? MOVE TO OWN FUNCTION
-			containsFinalState := false
-			for _, stateId := range moveEpsClosure.Values() {
-				if NCA.FinalStates.Contains(stateId) {
-					containsFinalState = true
-					break
-				}
-			}
+			containsFinalState := NCA.FinalStates.Any(func(_ int, value interface{}) bool {
+				finalStateId := value.(int)
+				return moveEpsClosure.Contains(finalStateId)
+			})
 
 			// If the eps-closure extracted already exist in tSet (has been already disvocered)
 			// then retrieves its twin's id from the map, and use the latter instead of its twin
-			// ? MOVE TO OWN FUNCTION
 			twinIndex, twinId := tSet.Find(func(_ int, item interface{}) bool {
 				c := item.(*set.Set)
 				// Simple tricK: If A is contained in B and viceversa then A equals B
@@ -83,9 +79,7 @@ func SubsetConstruction(NCA *fsa.FSA) *fsa.FSA {
 	return DCA
 }
 
-// TODO COMMENT
-// TODO COMMENT
-// TODO COMMENT
+// Given a set of states calculates the aggregate epsilon closure of said states and returns it
 func newEpsClosure(automata *fsa.FSA, states *set.Set) *set.Set {
 	// A set to keep track of all the states already reached
 	reachedStates := set.New(states.Values()...)
@@ -109,9 +103,7 @@ func newEpsClosure(automata *fsa.FSA, states *set.Set) *set.Set {
 	return reachedStates
 }
 
-// TODO comment
-// TODO comment
-// TODO comment
+//Returns the set of reachable states from the closure (or set of state) "clos" with the given move
 func getReachable(automata *fsa.FSA, clos *set.Set, move fsa.Transition) *set.Set {
 	// Init an empty list of states reachable
 	tReachable := set.New()

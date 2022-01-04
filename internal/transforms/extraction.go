@@ -1,8 +1,11 @@
-// Copyright Enea Guidi (hmny).
+// Copyright 2020 Enea Guidi (hmny). All rights reserved.
+// This file are distributed under the General Public License v 3.0.
+// A copy of abovesaid license can be found in the LICENSE file.
 
-// TODO COMMENT
-
-// TODO comment
+// Package transforms declares the types and functions used to represent and work with
+// ProjectionAutomata (also referenced as Local Views) for a given Goroutine. They also implements
+// general pourpose algorithm for Finite State Automata (FSA) such as Subset Construction Algorithm
+//
 package transforms
 
 import (
@@ -24,11 +27,11 @@ type ProjectionAutomata struct {
 	Automata *fsa.FSA // The FSA itself
 }
 
-// Extracts the Projection (or Local) Choreography Automata for the given FuncMeta. The ScopeAutomata of
-// said function is used as entry point of the Projection CA. Every call to another function is expanded inline
-// in Local Automata (channel and callbacks passed as argument are expanded as well). When a new GoRoutine is
-// spawned during the execution flow a new Local Automata is generated. All the CA are transformed to a
-// deterministic version with the Subset Construction Algorithm
+// Extracts the Projection Automata (or "local view") for the given FuncMeta.
+// The ScopeAutomata of said function is used as entry point of the Projection CA.
+// Every call to another function is inlined in the local view.
+// When a new GoRoutine is spawned during the execution flow a new local view is generated.
+// Both Call and Spawn operation require expansion of formal arguments with actual ones
 func GetLocalViews(function meta.FuncMetadata, file meta.FileMetadata) []*ProjectionAutomata {
 	// Creates the Projection Automata for the current GoRoutine
 	current := ProjectionAutomata{
@@ -50,13 +53,11 @@ func GetLocalViews(function meta.FuncMetadata, file meta.FileMetadata) []*Projec
 		}
 	})
 
-	// extractedList[0].Automata = subsetConstruction(current.Automata)
 	return extractedList
 }
 
-// TODO Comment
-// TODO Comment
-// TODO Comment
+// Handles the Call transition in a local view (or Projection Automata), the call transition is removed
+// and the Scope Automata of the called function is inlined at her place (once the actual arguments are expanded)
 func inlineCallTransition(file meta.FileMetadata, root *fsa.FSA, from, to int, t fsa.Transition) {
 	// Tries to retrieve the called function metadata from the file
 	calledFunc, hasMeta := file.FunctionMeta[t.Label]
@@ -77,9 +78,9 @@ func inlineCallTransition(file meta.FileMetadata, root *fsa.FSA, from, to int, t
 	inlineAutomata(root, from, to, t, calledScopeAutomata)
 }
 
-// TODO Comment
-// TODO Comment
-// TODO Comment
+// Hansles the Spawn transition in a local view (or Projection Automata), the local view of the newly spawned
+// is extracted with eventually the his "child" Goroutine and then the transition is updated with a reference
+// to the ProjectionAutomata struct of the spawned Goroutine
 func extractSpawnTransition(file meta.FileMetadata, root *fsa.FSA, from, to int, t fsa.Transition) []*ProjectionAutomata {
 	// Tries to retrieve the called function metadata from the file
 	calledFunc, hasMeta := file.FunctionMeta[t.Label]
@@ -113,12 +114,11 @@ func replaceActualArgs(t fsa.Transition, calledFunc meta.FuncMetadata) *fsa.FSA 
 	// Copies the ScopeAutomata of the called function
 	calledAutomataCp := calledFunc.ScopeAutomata.Copy()
 	// Retrieves the actual arguments from the Call transition
-	expandArgs, isList := t.Payload.([]meta.FuncArg)
+	expandArgs, _ := t.Payload.([]meta.FuncArg)
 
 	// Bails out at the first discrepancy returning a non-expanded copy
-	if !isList || len(expandArgs) <= 0 || len(calledFunc.InlineArgs) <= 0 {
-		// TODO REMOVE => return calledAutomataCp
-		log.Fatal("Could not expand actual arguments: requested %d but given %d\n", len(calledFunc.InlineArgs), len(expandArgs))
+	if len(expandArgs) != len(calledFunc.InlineArgs) {
+		log.Fatalf("Could not expand actual arguments: requested %d but given %d\n", len(calledFunc.InlineArgs), len(expandArgs))
 	}
 
 	// Expands the actual arguments with the positional ones
@@ -149,7 +149,6 @@ func replaceActualArgs(t fsa.Transition, calledFunc meta.FuncMetadata) *fsa.FSA 
 // This function expands a graph in place of an transition. Since in our case every
 // Automata/Graph has only one initial and final state then we simply copy the other graph
 // state by state and transition by transition and then we link the copy to the "from" and "to" states
-// TODO COMMENTS
 func inlineAutomata(root *fsa.FSA, from, to int, t fsa.Transition, other *fsa.FSA) {
 	// First of all remove the old call transition
 	root.RemoveTransition(from, to, t)

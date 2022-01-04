@@ -1,4 +1,6 @@
-// Copyright Enea Guidi (hmny).
+// Copyright 2020 Enea Guidi (hmny). All rights reserved.
+// This file are distributed under the General Public License v 3.0.
+// A copy of abovesaid license can be found in the LICENSE file.
 
 // This package implements a Finite State Automata (FSA) data structure and its own API.
 // For this specific use cases the implementation is quite simple & basic
