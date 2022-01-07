@@ -32,7 +32,7 @@ type ProjectionAutomata struct {
 // Every call to another function is inlined in the local view.
 // When a new GoRoutine is spawned during the execution flow a new local view is generated.
 // Both Call and Spawn operation require expansion of formal arguments with actual ones
-func GetLocalViews(function meta.FuncMetadata, file meta.FileMetadata) []*ProjectionAutomata {
+func GetLocalViews(function meta.FuncMetadata, file meta.FileMetadata) map[string]*ProjectionAutomata {
 	// Creates the Projection Automata for the current GoRoutine
 	current := ProjectionAutomata{
 		Name:     fmt.Sprintf("Goroutine %d (%s)", nProjectionExtracted, function.Name),
@@ -40,7 +40,7 @@ func GetLocalViews(function meta.FuncMetadata, file meta.FileMetadata) []*Projec
 	}
 
 	nProjectionExtracted++
-	extractedList := []*ProjectionAutomata{&current}
+	extractedList := map[string]*ProjectionAutomata{current.Name: &current}
 
 	// Iterates over each transition in the ScopeAutomata
 	function.ScopeAutomata.ForEachTransition(func(from, to int, t fsa.Transition) {
@@ -48,8 +48,9 @@ func GetLocalViews(function meta.FuncMetadata, file meta.FileMetadata) []*Projec
 		case fsa.Call:
 			inlineCallTransition(file, current.Automata, from, to, t)
 		case fsa.Spawn:
-			newLocalAutomata := extractSpawnTransition(file, current.Automata, from, to, t)
-			extractedList = append(extractedList, newLocalAutomata...)
+			for key, pAutomata := range extractSpawnTransition(file, current.Automata, from, to, t) {
+				extractedList[key] = pAutomata
+			}
 		}
 	})
 
@@ -81,7 +82,7 @@ func inlineCallTransition(file meta.FileMetadata, root *fsa.FSA, from, to int, t
 // Hansles the Spawn transition in a local view (or Projection Automata), the local view of the newly spawned
 // is extracted with eventually the his "child" Goroutine and then the transition is updated with a reference
 // to the ProjectionAutomata struct of the spawned Goroutine
-func extractSpawnTransition(file meta.FileMetadata, root *fsa.FSA, from, to int, t fsa.Transition) []*ProjectionAutomata {
+func extractSpawnTransition(file meta.FileMetadata, root *fsa.FSA, from, to int, t fsa.Transition) map[string]*ProjectionAutomata {
 	// Tries to retrieve the called function metadata from the file
 	calledFunc, hasMeta := file.FunctionMeta[t.Label]
 
@@ -93,14 +94,18 @@ func extractSpawnTransition(file meta.FileMetadata, root *fsa.FSA, from, to int,
 
 	// Expands positional arguments with the actual ones
 	calledFunc.ScopeAutomata = replaceActualArgs(t, calledFunc)
+	// Precalculates the key used for retrieval of the first local view extracted
+	calledFuncKey := fmt.Sprintf("Goroutine %d (%s)", nProjectionExtracted, calledFunc.Name)
 
 	// Recursively call getProjectionAutomata on the spawned GoRoutine entrypoint
 	//(the function called with go keyword), then returns the extracted Projection Automata
 	// the first is always the spawned one, the others can be function spawned by the one spawned by us
 	newLocalAutomata := GetLocalViews(calledFunc, file)
+	// Retrieves a reference to the first local view
+	localViewRef := newLocalAutomata[calledFuncKey]
 
 	// Overrides the older transition with additional data (reference to the spawned ProjectionAutomata)
-	newT := fsa.Transition{Move: t.Move, Label: t.Label, Payload: newLocalAutomata[0]}
+	newT := fsa.Transition{Move: t.Move, Label: localViewRef.Name, Payload: localViewRef}
 	root.RemoveTransition(from, to, t)
 	root.AddTransition(from, to, newT)
 
