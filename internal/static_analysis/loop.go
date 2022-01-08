@@ -61,6 +61,11 @@ func parseRangeStmt(stmt *ast.RangeStmt, fm *FuncMetadata) {
 				matchFound = true
 			}
 		}
+		for argName := range fm.InlineArgs {
+			if argName == iterateeIdent.Name {
+				matchFound = true
+			}
+		}
 	}
 
 	// Saves a local copy of the current id, all the branch will fork from it
@@ -70,8 +75,9 @@ func parseRangeStmt(stmt *ast.RangeStmt, fm *FuncMetadata) {
 	// and add it as a transaction, if we're using range on a channel then the transition became
 	// a Recv transition since on channel this is the default overload of "range" keyword
 	if matchFound {
-		tEpsStart := fsa.Transition{Move: fsa.Recv, Label: iterateeIdent.Name}
-		fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tEpsStart)
+		channelMeta := fm.ChanMeta[iterateeIdent.Name]
+		tRecvStart := fsa.Transition{Move: fsa.Recv, Label: iterateeIdent.Name, Payload: channelMeta}
+		fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tRecvStart)
 	} else {
 		tEpsStart := fsa.Transition{Move: fsa.Eps, Label: "range-iteration-start"}
 		fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tEpsStart)

@@ -39,7 +39,8 @@ type ChanMetadata struct {
 func parseSendStmt(stmt *ast.SendStmt, fm *FuncMetadata) {
 	chanIdent, isIdent := stmt.Chan.(*ast.Ident)
 	if isIdent {
-		tSend := fsa.Transition{Move: fsa.Send, Label: chanIdent.Name}
+		channelMeta := fm.ChanMeta[chanIdent.Name]
+		tSend := fsa.Transition{Move: fsa.Send, Label: chanIdent.Name, Payload: channelMeta}
 		fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tSend)
 	} else {
 		log.Fatalf("Could't find identifier in SendStmt at line: %d\n", stmt.Pos())
@@ -60,7 +61,8 @@ func parseRecvStmt(expr *ast.UnaryExpr, fm *FuncMetadata) {
 	}
 
 	// Creates a valid transaction struct
-	tRecv := fsa.Transition{Move: fsa.Recv, Label: chanIdent.Name}
+	channelMeta := fm.ChanMeta[chanIdent.Name]
+	tRecv := fsa.Transition{Move: fsa.Recv, Label: chanIdent.Name, Payload: channelMeta}
 	fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tRecv)
 }
 
