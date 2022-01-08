@@ -9,6 +9,7 @@
 package transforms
 
 import (
+	"fmt"
 	"log"
 
 	list "github.com/emirpasic/gods/lists/singlylinkedlist"
@@ -19,7 +20,8 @@ import (
 
 type SimulationChannel struct {
 	meta.ChanMetadata
-	msgQueue *list.List
+	blockedReceivers *list.List
+	blockedSenders   *list.List
 }
 
 type SimulationAutomata struct {
@@ -53,7 +55,6 @@ func GenerateDCA(localViews map[string]*ProjectionAutomata) *fsa.FSA {
 		channelMap:     make(map[string]SimulationChannel),
 	}
 
-	// ToDo change with full on iterator
 	for !simState.goroutineStack.Empty() {
 		// Retireves the Goroutine to be processed (simulated)
 		item, _ := simState.goroutineStack.Get(0)
@@ -61,6 +62,12 @@ func GenerateDCA(localViews map[string]*ProjectionAutomata) *fsa.FSA {
 
 		// Removes it from the queue (will eventually be added later)
 		simState.goroutineStack.Remove(0)
+
+		fmt.Printf("%s =>\t", simProc.Name)
+		for _, tmp := range simState.goroutineStack.Values() {
+			fmt.Printf("%s,  ", tmp.(SimulationAutomata).Name)
+		}
+		fmt.Println()
 
 		// Process every transition possible from the current simulation state
 		simProc.forEachNextTransition(func(from, to int, t fsa.Transition) {
@@ -75,7 +82,7 @@ func GenerateDCA(localViews map[string]*ProjectionAutomata) *fsa.FSA {
 			case fsa.Spawn:
 				handleSpawnOp(simState, t, copyProcess)
 			default:
-				log.Fatalf("Unexpected transition %s", t)
+				log.Fatalf("Unexpected transition: %s", t)
 			}
 		})
 
@@ -88,28 +95,26 @@ func GenerateDCA(localViews map[string]*ProjectionAutomata) *fsa.FSA {
 func handleRecvOp(simState State, t fsa.Transition, proc SimulationAutomata) {
 	simChan, exist := simState.channelMap[t.Label]
 
-	// Since the data about the channel doesn't even exist the process is blocked in the queue
 	if !exist {
 		// Retrieve channel metadata and create a new queue
 		chanMeta := t.Payload.(meta.ChanMetadata)
-		msgQueue := list.New(proc)
-		// Create a simulated channel and adds it to the map before returning
-		newSimChan := SimulationChannel{chanMeta, msgQueue}
-		simState.channelMap[t.Label] = newSimChan
-		return
+		// Create a simulated channel and adds it to the map
+		simChan = SimulationChannel{chanMeta, list.New(), list.New()}
+		simState.channelMap[t.Label] = simChan
 	}
 
-	// If the channel is buffered (synchronous) or the buffer is empty then
-	// the proces must block onto it
-	if !simChan.Async || simChan.msgQueue.Empty() {
-		simChan.msgQueue.Add(proc)
-		return
+	if !simChan.blockedSenders.Empty() {
+		// Retrieves the blocked sender
+		item, _ := simChan.blockedSenders.Get(0)
+		blockedSender := item.(SimulationAutomata)
+		// Adds the blocked sender and the current process to the list of active Goroutine
+		simState.goroutineStack.Add(blockedSender)
+		simState.goroutineStack.Insert(0, proc)
+		// Removes from the blocked queue before returning
+		simChan.blockedSenders.Remove(0)
+	} else {
+		simChan.blockedReceivers.Insert(0, proc)
 	}
-
-	// Get the first element and return it without blocking the receiver
-	msg, _ := simChan.msgQueue.Get(0)
-	simState.goroutineStack.Add(msg)
-	simChan.msgQueue.Remove(0)
 }
 
 func handleSendOp(simState State, t fsa.Transition, proc SimulationAutomata) {
@@ -118,21 +123,30 @@ func handleSendOp(simState State, t fsa.Transition, proc SimulationAutomata) {
 	if !exist {
 		// Retrieve channel metadata and create a new queue
 		chanMeta := t.Payload.(meta.ChanMetadata)
-		msgQueue := list.New(proc)
-		// Create a simulated channel and adds it to the map before returning
-		newSimChan := SimulationChannel{chanMeta, msgQueue}
-		simState.channelMap[t.Label] = newSimChan
+		// Create a simulated channel and adds it to the map
+		simChan = SimulationChannel{chanMeta, list.New(), list.New()}
+		simState.channelMap[t.Label] = simChan
+	}
+
+	if !simChan.blockedReceivers.Empty() {
+		// Retrieves the blocked receiver
+		item, _ := simChan.blockedReceivers.Get(0)
+		blockedReceiver := item.(SimulationAutomata)
+		// Adds the blocked receiver to the list of active Goroutine
+		simState.goroutineStack.Add(blockedReceiver)
+		simState.goroutineStack.Add(proc)
+		// Removes from the blocked queue before returning
+		simChan.blockedReceivers.Remove(0)
 		return
 	}
 
-	if !simChan.Async || simChan.msgQueue.Size() > simChan.BufferSize {
-		simChan.msgQueue.Add(proc)
-		return
-	}
-
-	msg, _ := simChan.msgQueue.Get(0)
-	simState.goroutineStack.Add(msg)
-	simChan.msgQueue.Remove(0)
+	// If the channel is synchronous (unbuffered) then the process is blocked
+	//if !simChan.Async {
+	simChan.blockedSenders.Insert(0, proc)
+	//}
+	// else { // Else the process is free to continue its execution
+	//	simState.goroutineStack.Insert(0, proc)
+	//}
 }
 
 func handleSpawnOp(simState State, t fsa.Transition, proc SimulationAutomata) {
