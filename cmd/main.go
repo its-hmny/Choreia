@@ -2,9 +2,9 @@
 // This file are distributed under the General Public License v 3.0.
 // A copy of abovesaid license can be found in the LICENSE file.
 
-// This package contains the entry point of the whole program, it handles
-// directly all the interaction with its utility module with the final pourpose
-// of extracting a Choreography Automata from the given input file
+// This is the entry point of the whole program (Choreia).
+// It handles directly all the interaction with the respective utilities module in order
+// to extract the Choreography Automata from the given input file
 package main
 
 import (
