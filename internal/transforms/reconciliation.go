@@ -80,72 +80,96 @@ func FSAComposition(localViews map[string]*ProjectionAutomata) CompositionFSA {
 	return cAutomata
 }
 
-	log.Fatalf("GenerateDCA not implemented")
-	return fsa.New()
+// TODO COMMENT
+// TODO COMMENT
+// TODO COMMENT
+func Synchronization(comp CompositionFSA, main *ProjectionAutomata) *fsa.FSA {
+	synchAutomata := fsa.New()
+
+	entrypoint := FrozenAutomata{main, 0}
+	wildcard := FrozenAutomata{nil, Wildcard}
+
+	visitedCouples := list.New(set.New(entrypoint, wildcard))
+
+	for _, item := range comp.couples.Values() {
+		// Preliminaries conversion and extraction
+		couple := item.(*set.Set)
+		values := couple.Values()
+		frozenA := values[0].(FrozenAutomata)
+		frozenB := values[1].(FrozenAutomata)
+
+		frozenA.localView.Automata.ForEachTransition(func(fromA, toA int, tA fsa.Transition) {
+			frozenB.localView.Automata.ForEachTransition(func(fromB, toB int, tB fsa.Transition) {
+				if fromA != frozenA.state || fromB != frozenB.state {
+					return
+				}
+
+				newFrozenA := FrozenAutomata{frozenA.localView, toA}
+				newFrozenB := FrozenAutomata{frozenB.localView, toB}
+
+				if tA.Move == fsa.Spawn {
+					handleSpawn(synchAutomata, visitedCouples, frozenA, newFrozenA, tA)
+				}
+
+				if tB.Move == fsa.Spawn {
+					handleSpawn(synchAutomata, visitedCouples, frozenB, newFrozenB, tB)
+				}
+
+				if tA.Move == fsa.Send && tB.Move == fsa.Recv && tA.Label == tB.Label {
+					handleSync(synchAutomata, visitedCouples, frozenA, newFrozenA, frozenB, newFrozenB)
+				} else if tB.Move == fsa.Send && tA.Move == fsa.Recv && tA.Label == tB.Label {
+					handleSync(synchAutomata, visitedCouples, frozenB, newFrozenB, frozenA, newFrozenA)
+				}
+			})
+		})
+	}
+
+	return synchAutomata
 }
 
-func handleRecvOp(simState State, t fsa.Transition, proc SimulationAutomata) {
-	simChan, exist := simState.channelMap[t.Label]
+func handleSpawn(sync *fsa.FSA, couples *list.List, prev, next FrozenAutomata, t fsa.Transition) {
+	wildcard := FrozenAutomata{nil, Wildcard}
 
-	if !exist {
-		// Retrieve channel metadata and create a new queue
-		chanMeta := t.Payload.(meta.ChanMetadata)
-		// Create a simulated channel and adds it to the map
-		simChan = SimulationChannel{chanMeta, list.New(), list.New()}
-		simState.channelMap[t.Label] = simChan
-	}
+	alreadyExist := couples.Any(func(_ int, item interface{}) bool {
+		couple := item.(*set.Set)
+		return couple.Contains(next, wildcard)
+	})
 
-	if !simChan.blockedSenders.Empty() {
-		// Retrieves the blocked sender
-		item, _ := simChan.blockedSenders.Get(0)
-		blockedSender := item.(SimulationAutomata)
-		// Adds the blocked sender and the current process to the list of active Goroutine
-		simState.goroutineStack.Add(blockedSender)
-		simState.goroutineStack.Insert(0, proc)
-		// Removes from the blocked queue before returning
-		simChan.blockedSenders.Remove(0)
-	} else {
-		simChan.blockedReceivers.Insert(0, proc)
+	if !alreadyExist {
+		interaction := fmt.Sprintf("%s ^ %s", prev.localView.Name, t.Label)
+		newT := fsa.Transition{Move: fsa.Empty, Label: interaction}
+
+		couples.Each(func(index int, item interface{}) {
+			couple := item.(*set.Set)
+			if couple.Contains(prev) {
+				fmt.Printf("%d <> %d \t %s\n", index, couples.Size(), newT)
+				sync.AddTransition(index, couples.Size(), newT)
+			}
+		})
+
+		couples.Add(set.New(next, wildcard))
 	}
 }
 
-func handleSendOp(simState State, t fsa.Transition, proc SimulationAutomata) {
-	simChan, exist := simState.channelMap[t.Label]
+func handleSync(sync *fsa.FSA, couples *list.List, sndrPrev, sndrNext, recvPrev, recvNext FrozenAutomata) {
+	id, _ := couples.Find(func(_ int, item interface{}) bool {
+		couple := item.(*set.Set)
+		return couple.Contains(sndrNext, recvNext)
+	})
 
-	if !exist {
-		// Retrieve channel metadata and create a new queue
-		chanMeta := t.Payload.(meta.ChanMetadata)
-		// Create a simulated channel and adds it to the map
-		simChan = SimulationChannel{chanMeta, list.New(), list.New()}
-		simState.channelMap[t.Label] = simChan
+	interaction := fmt.Sprintf("%s <- %s", recvNext.localView.Name, sndrNext.localView.Name)
+	newT := fsa.Transition{Move: fsa.Empty, Label: interaction}
+
+	if id == -1 {
+		id = couples.Size()
+		couples.Add(set.New(recvNext, sndrNext))
 	}
 
-	if !simChan.blockedReceivers.Empty() {
-		// Retrieves the blocked receiver
-		item, _ := simChan.blockedReceivers.Get(0)
-		blockedReceiver := item.(SimulationAutomata)
-		// Adds the blocked receiver to the list of active Goroutine
-		simState.goroutineStack.Add(blockedReceiver)
-		simState.goroutineStack.Add(proc)
-		// Removes from the blocked queue before returning
-		simChan.blockedReceivers.Remove(0)
-		return
-	}
-
-	// If the channel is synchronous (unbuffered) then the process is blocked
-	//if !simChan.Async {
-	simChan.blockedSenders.Insert(0, proc)
-	//}
-	// else { // Else the process is free to continue its execution
-	//	simState.goroutineStack.Insert(0, proc)
-	//}
-}
-
-func handleSpawnOp(simState State, t fsa.Transition, proc SimulationAutomata) {
-	// Retrieves the ProjectionAutomata for the spawned Goroutine
-	// and adds it to the simulation queue in order for it to be executed
-	spawnedLW := t.Payload.(*ProjectionAutomata)
-	simState.goroutineStack.Add(SimulationAutomata{*spawnedLW, 0})
-	// Then the execution of the current Goroutine can continue
-	simState.goroutineStack.Insert(0, proc)
+	couples.Each(func(index int, item interface{}) {
+		couple := item.(*set.Set)
+		if couple.Contains(sndrPrev) || couple.Contains(recvPrev) {
+			fmt.Printf("%d <> %d \t %s\n", index, id, newT)
+			sync.AddTransition(index, id, newT)
+		}
+	})
 }
