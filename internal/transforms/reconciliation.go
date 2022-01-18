@@ -10,83 +10,75 @@ package transforms
 
 import (
 	"fmt"
-	"log"
 
 	list "github.com/emirpasic/gods/lists/singlylinkedlist"
-	meta "github.com/its-hmny/Choreia/internal/static_analysis"
+	set "github.com/emirpasic/gods/sets/hashset"
 
 	"github.com/its-hmny/Choreia/internal/data_structures/fsa"
 )
 
-type SimulationChannel struct {
-	meta.ChanMetadata
-	blockedReceivers *list.List
-	blockedSenders   *list.List
+const Wildcard = -1
+
+type FrozenAutomata struct {
+	localView *ProjectionAutomata
+	state     int
 }
 
-type SimulationAutomata struct {
-	ProjectionAutomata
-	currentState int
-}
-
-type State struct {
-	goroutineStack *list.List
-	channelMap     map[string]SimulationChannel
-}
-
-func (s SimulationAutomata) forEachNextTransition(callback func(from, to int, t fsa.Transition)) {
-	s.Automata.ForEachTransition(func(from, to int, t fsa.Transition) {
-		if from != s.currentState {
-			return
-		}
-
-		callback(from, to, t)
-	})
+type CompositionFSA struct {
+	couples *list.List
 }
 
 // ! Must be implemented
 // Takes the deterministic version of the Local Views (or Projection Automata) and merges them
 // in one DCA that will represent the choreography as a whole (the global view)
 func GenerateDCA(localViews map[string]*ProjectionAutomata) *fsa.FSA {
-	mainLW := localViews["Goroutine 0 (main)"]
+	// mainLW := localViews["Goroutine 0 (main)"]
+	compositionFSA := FSAComposition(localViews)
+	fmt.Printf("\nCompositionAutomata has %d states\n\n", compositionFSA.couples.Size())
 
-	simState := State{
-		goroutineStack: list.New(SimulationAutomata{*mainLW, 0}),
-		channelMap:     make(map[string]SimulationChannel),
-	}
+	synchronizedFSA := Synchronization(compositionFSA, localViews["Goroutine 0 (main)"])
 
-	for !simState.goroutineStack.Empty() {
-		// Retireves the Goroutine to be processed (simulated)
-		item, _ := simState.goroutineStack.Get(0)
-		simProc := item.(SimulationAutomata)
+	return synchronizedFSA
+}
 
-		// Removes it from the queue (will eventually be added later)
-		simState.goroutineStack.Remove(0)
+// TODO COMMENT
+// TODO COMMENT
+// TODO COMMENT
+func FSAComposition(localViews map[string]*ProjectionAutomata) CompositionFSA {
+	cAutomata := CompositionFSA{list.New()}
 
-		fmt.Printf("%s =>\t", simProc.Name)
-		for _, tmp := range simState.goroutineStack.Values() {
-			fmt.Printf("%s,  ", tmp.(SimulationAutomata).Name)
-		}
-		fmt.Println()
-
-		// Process every transition possible from the current simulation state
-		simProc.forEachNextTransition(func(from, to int, t fsa.Transition) {
-			copyProcess := simProc
-			copyProcess.currentState = to
-
-			switch t.Move {
-			case fsa.Send:
-				handleSendOp(simState, t, copyProcess)
-			case fsa.Recv:
-				handleRecvOp(simState, t, copyProcess)
-			case fsa.Spawn:
-				handleSpawnOp(simState, t, copyProcess)
-			default:
-				log.Fatalf("Unexpected transition: %s", t)
+	for _, lView := range localViews {
+		for _, otherView := range localViews {
+			// Avoids to compose the automata x with itself
+			if lView == otherView {
+				continue
 			}
-		})
 
+			lView.Automata.ForEachState(func(lViewId int) {
+				otherView.Automata.ForEachState(func(otherViewId int) {
+					// Creates the "frozen" instances (automata + state in which is frozen)
+					frozenA := FrozenAutomata{lView, lViewId}
+					frozenB := FrozenAutomata{otherView, otherViewId}
+
+					// Checks that the couple hasn't been already indexed
+					exist := cAutomata.couples.Any(func(_ int, item interface{}) bool {
+						couple := item.(*set.Set)
+						return couple.Contains(frozenA, frozenB)
+					})
+
+					// If the couple hasn't been indexed then is added
+					if !exist {
+						// ! REMOVE
+						fmt.Printf("%s -> %d \t %s -> %d\n", lView.Name, lViewId, otherView.Name, otherViewId)
+						cAutomata.couples.Add(set.New(frozenA, frozenB))
+					}
+				})
+			})
+		}
 	}
+
+	return cAutomata
+}
 
 	log.Fatalf("GenerateDCA not implemented")
 	return fsa.New()
