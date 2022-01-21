@@ -18,11 +18,13 @@ import (
 
 var nProjectionExtracted = 0
 
+const nameTemplate = "%s (%d)"
+
 // -------------------------------------------------------------------------------------------
 // ProjectionAutomata
 
 // A FSA that represents the execution flow of a single Goroutine (identified by its own name)
-type ProjectionAutomata struct {
+type ProjectionFSA struct {
 	Name     string   // An identifier for the Automata
 	Automata *fsa.FSA // The FSA itself
 }
@@ -32,15 +34,15 @@ type ProjectionAutomata struct {
 // Every call to another function is inlined in the local view.
 // When a new GoRoutine is spawned during the execution flow a new local view is generated.
 // Both Call and Spawn operation require expansion of formal arguments with actual ones
-func GetLocalViews(function meta.FuncMetadata, file meta.FileMetadata) map[string]*ProjectionAutomata {
+func GetLocalViews(function meta.FuncMetadata, file meta.FileMetadata) map[string]*ProjectionFSA {
 	// Creates the Projection Automata for the current GoRoutine
-	current := ProjectionAutomata{
-		Name:     fmt.Sprintf("Goroutine %d (%s)", nProjectionExtracted, function.Name),
+	current := ProjectionFSA{
+		Name:     fmt.Sprintf(nameTemplate, function.Name, nProjectionExtracted),
 		Automata: function.ScopeAutomata.Copy(), // Makes a full independent copy of the funcMeta.ScopeAutomata
 	}
 
 	nProjectionExtracted++
-	extractedList := map[string]*ProjectionAutomata{current.Name: &current}
+	extractedList := map[string]*ProjectionFSA{current.Name: &current}
 
 	// Iterates over each transition in the ScopeAutomata
 	function.ScopeAutomata.ForEachTransition(func(from, to int, t fsa.Transition) {
@@ -82,7 +84,7 @@ func inlineCallTransition(file meta.FileMetadata, root *fsa.FSA, from, to int, t
 // Hansles the Spawn transition in a local view (or Projection Automata), the local view of the newly spawned
 // is extracted with eventually the his "child" Goroutine and then the transition is updated with a reference
 // to the ProjectionAutomata struct of the spawned Goroutine
-func extractSpawnTransition(file meta.FileMetadata, root *fsa.FSA, from, to int, t fsa.Transition) map[string]*ProjectionAutomata {
+func extractSpawnTransition(file meta.FileMetadata, root *fsa.FSA, from, to int, t fsa.Transition) map[string]*ProjectionFSA {
 	// Tries to retrieve the called function metadata from the file
 	calledFunc, hasMeta := file.FunctionMeta[t.Label]
 
@@ -95,7 +97,7 @@ func extractSpawnTransition(file meta.FileMetadata, root *fsa.FSA, from, to int,
 	// Expands positional arguments with the actual ones
 	calledFunc.ScopeAutomata = replaceActualArgs(t, calledFunc)
 	// Precalculates the key used for retrieval of the first local view extracted
-	calledFuncKey := fmt.Sprintf("Goroutine %d (%s)", nProjectionExtracted, calledFunc.Name)
+	calledFuncKey := fmt.Sprintf(nameTemplate, calledFunc.Name, nProjectionExtracted)
 
 	// Recursively call getProjectionAutomata on the spawned GoRoutine entrypoint
 	//(the function called with go keyword), then returns the extracted Projection Automata
