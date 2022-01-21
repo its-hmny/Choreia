@@ -23,8 +23,10 @@ func main() {
 	// Select from both channels
 	select {
 	case <-chanA:
+		<-chanB
 		fmt.Println("Received from channel A")
 	case <-chanB:
+		<-chanA
 		fmt.Println("Received from channel B")
 	default:
 		fmt.Println("Both A and B doesn't have messages")

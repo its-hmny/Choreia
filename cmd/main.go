@@ -66,7 +66,7 @@ func main() {
 	// For each local view of the Choreography Automata applies transformations (determinization, minimization)
 	for _, lView := range localViews {
 		// Exports the local view (NFA version)
-		filenameNFA := fmt.Sprintf("%s/NFA-%s.svg", *outputPath, lView.Name)
+		filenameNFA := fmt.Sprintf("%s/NFA %s.svg", *outputPath, lView.Name)
 		lView.Automata.Export(filenameNFA, graphviz.SVG)
 
 		// Determinization of the local view FSA
@@ -74,7 +74,7 @@ func main() {
 		// TODO: Add minimization of the DFA
 
 		// Constructs and exports the local view (DFA version)
-		filenameDFA := fmt.Sprintf("%s/DFA-%s.svg", *outputPath, lView.Name)
+		filenameDFA := fmt.Sprintf("%s/DFA %s.svg", *outputPath, lView.Name)
 		lViewDFA.Export(filenameDFA, graphviz.SVG)
 
 		// Updates the automata for the local view
