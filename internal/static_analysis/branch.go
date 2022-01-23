@@ -41,13 +41,18 @@ func parseIfStmt(stmt *ast.IfStmt, fm *FuncMetadata) {
 	mergeStateId := fm.ScopeAutomata.GetLastId()
 
 	// If an else block is specified then its parsed on its own branch
-	tEpsElseStart := fsa.Transition{Move: fsa.Eps, Label: "else-block-start"}
-	fm.ScopeAutomata.AddTransition(branchingStateId, fsa.NewState, tEpsElseStart)
-	// Parses the else block
-	ast.Walk(fm, stmt.Else)
-	// Links the else-block-end to the same destination as the if-block-end
-	tEpsElseEnd := fsa.Transition{Move: fsa.Eps, Label: "else-block-end"}
-	fm.ScopeAutomata.AddTransition(fsa.Current, mergeStateId, tEpsElseEnd)
+	if stmt.Else != nil {
+		tEpsElseStart := fsa.Transition{Move: fsa.Eps, Label: "else-block-start"}
+		fm.ScopeAutomata.AddTransition(branchingStateId, fsa.NewState, tEpsElseStart)
+		// Parses the else block
+		ast.Walk(fm, stmt.Else)
+		// Links the else-block-end to the same destination as the if-block-end
+		tEpsElseEnd := fsa.Transition{Move: fsa.Eps, Label: "else-block-end"}
+		fm.ScopeAutomata.AddTransition(fsa.Current, mergeStateId, tEpsElseEnd)
+	} else { // Else the if statement can be skipped the execution flow stays on the main branch
+		tEpsIfSkip := fsa.Transition{Move: fsa.Eps, Label: "if-block-skip"}
+		fm.ScopeAutomata.AddTransition(branchingStateId, mergeStateId, tEpsIfSkip)
+	}
 
 	// Set the new root of the PartialAutomata, from which all future transition will start
 	fm.ScopeAutomata.SetRootId(mergeStateId)
