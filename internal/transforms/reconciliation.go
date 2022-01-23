@@ -28,11 +28,9 @@ type FrozenFSA struct {
 
 var wildcard = FrozenFSA{&ProjectionFSA{Name: "Wildcard"}, -1}
 
-// TODO COMMENT
-// TODO COMMENT
-// TODO COMMENT
-// TODO Refactor
-func ForEachCoupleTransition(cFSA CompositionFSA, f func(A, B FrozenFSA, tA, tB fsa.Transition, toA, toB int)) {
+// Utility function to iterate over every possible combination of transition (tA and tB) for
+// a given state of the Composition FSA which is a couple of states from different FSAs
+func forEachCoupleTransition(cFSA CompositionFSA, f func(A, B FrozenFSA, tA, tB fsa.Transition, toA, toB int)) {
 	for _, item := range (*list.List)(cFSA).Values() {
 		// Preliminaries conversion and extraction
 		couple := item.(*set.Set)
@@ -52,9 +50,39 @@ func ForEachCoupleTransition(cFSA CompositionFSA, f func(A, B FrozenFSA, tA, tB 
 	}
 }
 
-// ! Must be implemented
+// Utility function that searches for a couple (the set) into a list of said couples.
+// Since the list is assumed to have all the couples the case in which the couple is not
+// found is not contemplated and will stop the execution with an error
+func findCoupleId(list *list.List, toFind *set.Set) int {
+	id, _ := list.Find(func(_ int, item interface{}) bool {
+		couple := item.(*set.Set)
+		return couple.Contains(toFind.Values()...)
+	})
+
+	if id == -1 {
+		log.Fatal("Could not find couple")
+	}
+
+	return id
+}
+
+// Utility functions that creates a transition from every state that countains at least one
+// element in the fromCouple to the state identified by destId and with newT transitions
+func createTransitions(syncFSA *fsa.FSA, couples *list.List, fromCouple *set.Set, destId int, newT fsa.Transition) {
+	couples.Each(func(currentId int, item interface{}) {
+		couple := item.(*set.Set)
+		for _, frozenFSA := range fromCouple.Values() {
+			if couple.Contains(frozenFSA) {
+				fmt.Printf("(From %d => to %d) \t %s\n", currentId, destId, newT)
+				syncFSA.AddTransition(currentId, destId, newT)
+			}
+		}
+	})
+}
+
 // Takes the deterministic version of the Local Views (or Projection Automata) and merges them
-// in one DCA that will represent the choreography as a whole (the global view)
+// in one DCA that will represent the choreography as a whole (the global view). This is possible
+// by composing all the Local View's FSAs into one and then appply a Synchronization transform on it
 func GenerateDCA(localViews map[string]*ProjectionFSA) *fsa.FSA {
 	cFSA := fsaComposition(localViews)
 	fmt.Printf("CompositionAutomata has %d states\n\n", ((*list.List)(cFSA)).Size())
@@ -117,7 +145,7 @@ func precalcSynchedCouples(cFSA CompositionFSA, entrypoint *set.Set) *list.List 
 	// Creates the list with the synched couples
 	synchedCouples := list.New(entrypoint)
 
-	ForEachCoupleTransition(cFSA, func(fA, fB FrozenFSA, tA, tB fsa.Transition, toA, toB int) {
+	forEachCoupleTransition(cFSA, func(fA, fB FrozenFSA, tA, tB fsa.Transition, toA, toB int) {
 		var couple *set.Set // Initializes and empty couple
 
 		// Retrieve the "destination" couple of the current one
@@ -153,88 +181,57 @@ func precalcSynchedCouples(cFSA CompositionFSA, entrypoint *set.Set) *list.List 
 	return synchedCouples // Returns the "synched" couple list
 }
 
-// TODO COMMENT
-// TODO COMMENT
-// TODO COMMENT
+// Iterates over the composition FSA and whenver it found a couple of state (and their respective FSA
+// & transtistions) that can be synchronized: 1) they make their own operations (e.g. Spawn) they make
+// opposite transition on the same channel (Send & Receive on x) then it links this couple with every other
+// couple in the synchronization FSA that can reach the current one.
 func fsaSynchronization(cFSA CompositionFSA, synchedCouples *list.List) *fsa.FSA {
 	// Initializes the synchronized FSA
 	synchAutomata := fsa.New()
 
-	// ! synchedCouples.Any(func(_ int, item interface{}) bool {
-	// ! 	couple := item.(*set.Set)
-	// ! 	val := couple.Values()
-	// ! 	A := val[0].(FrozenAutomata)
-	// ! 	B := val[1].(FrozenAutomata)
-	// ! 	fmt.Println(A.localView.Name, A.state, B.localView.Name, B.state)
-	// ! 	return false
-	// ! })
-	// ! fmt.Println()
-
-	ForEachCoupleTransition(cFSA, func(frozenA, frozenB FrozenFSA, tA, tB fsa.Transition, toA, toB int) {
+	// ! Refactor this mess
+	forEachCoupleTransition(cFSA, func(frozenA, frozenB FrozenFSA, tA, tB fsa.Transition, toA, toB int) {
 		newFrozenA := FrozenFSA{frozenA.localView, toA}
 		newFrozenB := FrozenFSA{frozenB.localView, toB}
 
 		if tA.Move == fsa.Spawn {
-			handleSpawn(synchAutomata, synchedCouples, frozenA, newFrozenA, tA)
+			// Find the id of the current couple in the precalc list
+			id := findCoupleId(synchedCouples, set.New(newFrozenA, wildcard))
+			// Generate the new transition with label
+			interactionLabel := fmt.Sprintf("%s %q %s", frozenA.localView.Name, '\u22C1', tA.Label)
+			newT := fsa.Transition{Move: fsa.Empty, Label: interactionLabel}
+			// Add said transition to the final synchronization FSA
+			createTransitions(synchAutomata, synchedCouples, set.New(frozenA), id, newT)
 		}
 
 		if tB.Move == fsa.Spawn {
-			handleSpawn(synchAutomata, synchedCouples, frozenB, newFrozenB, tB)
+			// Find the id of the current couple in the precalc list
+			id := findCoupleId(synchedCouples, set.New(newFrozenB, wildcard))
+			// Generate the new transition with label
+			interactionLabel := fmt.Sprintf("%s %q %s", frozenB.localView.Name, '\u22C1', tB.Label)
+			newT := fsa.Transition{Move: fsa.Empty, Label: interactionLabel}
+			// Add said transition to the final synchronization FSA
+			createTransitions(synchAutomata, synchedCouples, set.New(frozenB), id, newT)
 		}
 
 		if tA.Move == fsa.Send && tB.Move == fsa.Recv && tA.Label == tB.Label {
-			handleSync(synchAutomata, synchedCouples, frozenA, newFrozenA, frozenB, newFrozenB)
+			// Find the id of the current couple in the precalc list
+			id := findCoupleId(synchedCouples, set.New(newFrozenA, newFrozenB))
+			// Generate the new transition with label
+			interactionLabel := fmt.Sprintf("%s %q %s", frozenB.localView.Name, '\u2190', frozenA.localView.Name)
+			newT := fsa.Transition{Move: fsa.Empty, Label: interactionLabel}
+			// Add said transition to the final synchronization FSA
+			createTransitions(synchAutomata, synchedCouples, set.New(frozenA, frozenB), id, newT)
 		} else if tB.Move == fsa.Send && tA.Move == fsa.Recv && tA.Label == tB.Label {
-			handleSync(synchAutomata, synchedCouples, frozenB, newFrozenB, frozenA, newFrozenA)
+			// Find the id of the current couple in the precalc list
+			id := findCoupleId(synchedCouples, set.New(newFrozenA, newFrozenB))
+			// Generate the new transition with label
+			interactionLabel := fmt.Sprintf("%s %q %s", frozenA.localView.Name, '\u2190', frozenB.localView.Name)
+			newT := fsa.Transition{Move: fsa.Empty, Label: interactionLabel}
+			// Add said transition to the final synchronization FSA
+			createTransitions(synchAutomata, synchedCouples, set.New(frozenA, frozenB), id, newT)
 		}
 	})
 
 	return synchAutomata
-}
-
-// TODO unify with handleSynch
-func handleSpawn(sync *fsa.FSA, couples *list.List, prev, next FrozenFSA, t fsa.Transition) {
-
-	id, _ := couples.Find(func(_ int, item interface{}) bool {
-		couple := item.(*set.Set)
-		return couple.Contains(next, wildcard)
-	})
-
-	if id == -1 {
-		log.Fatal("Could not find couple")
-	}
-
-	interaction := fmt.Sprintf("%s ^ %s", prev.localView.Name, t.Label)
-	newT := fsa.Transition{Move: fsa.Empty, Label: interaction}
-
-	couples.Each(func(index int, item interface{}) {
-		couple := item.(*set.Set)
-		if couple.Contains(prev) {
-			fmt.Printf("%d <> %d \t %s\n", index, id, newT)
-			sync.AddTransition(index, id, newT)
-		}
-	})
-}
-
-// TODO unify with handleSpawn
-func handleSync(sync *fsa.FSA, couples *list.List, sndrPrev, sndrNext, recvPrev, recvNext FrozenFSA) {
-	id, _ := couples.Find(func(_ int, item interface{}) bool {
-		couple := item.(*set.Set)
-		return couple.Contains(sndrNext, recvNext)
-	})
-
-	if id == -1 {
-		log.Fatal("Could not find couple")
-	}
-
-	interaction := fmt.Sprintf("%s %q %s", recvNext.localView.Name, '\u2190', sndrNext.localView.Name)
-	newT := fsa.Transition{Move: fsa.Empty, Label: interaction}
-
-	couples.Each(func(index int, item interface{}) {
-		couple := item.(*set.Set)
-		if couple.Contains(sndrPrev) || couple.Contains(recvPrev) {
-			fmt.Printf("%d <> %d \t %s\n", index, id, newT)
-			sync.AddTransition(index, id, newT)
-		}
-	})
 }
