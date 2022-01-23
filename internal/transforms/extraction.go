@@ -139,9 +139,10 @@ func replaceActualArgs(t fsa.Transition, calledFunc meta.FuncMetadata) *fsa.FSA 
 			// If such match is found then all the transition in the localCopy that references that
 			// positional argument are replaced with transition to the actual argument
 			calledAutomataCp.ForEachTransition(func(from, to int, t fsa.Transition) {
-				if funcArg.Type == meta.Channel && (t.Move == fsa.Recv || t.Move == fsa.Send) {
+				if funcArg.Type == meta.Channel && t.Label == funcArg.Name && (t.Move == fsa.Recv || t.Move == fsa.Send) {
 					newT := fsa.Transition{Move: t.Move, Label: actualArg.Name}
 					// Replace the transitions in the copied ScopeAutomata
+					fmt.Println(from, to, newT)
 					calledAutomataCp.RemoveTransition(from, to, t)
 					calledAutomataCp.AddTransition(from, to, newT)
 				}
