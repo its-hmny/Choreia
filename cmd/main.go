@@ -66,22 +66,22 @@ func main() {
 	// For each local view of the Choreography Automata applies transformations (determinization, minimization)
 	for _, lView := range localViews {
 		// Exports the local view (NFA version)
-		filenameNFA := fmt.Sprintf("%s/NFA %s.svg", *outputPath, lView.Name)
-		lView.Automata.Export(filenameNFA, graphviz.SVG)
+		filenameNFA := fmt.Sprintf("%s/NFA %s.dot", *outputPath, lView.Name)
+		lView.Automata.Export(filenameNFA, graphviz.XDOT)
 
 		// Determinization of the local view FSA
 		lViewDFA := transforms.SubsetConstruction(lView.Automata)
 		// TODO: Add minimization of the DFA
 
 		// Constructs and exports the local view (DFA version)
-		filenameDFA := fmt.Sprintf("%s/DFA %s.svg", *outputPath, lView.Name)
-		lViewDFA.Export(filenameDFA, graphviz.SVG)
+		filenameDFA := fmt.Sprintf("%s/DFA %s.dot", *outputPath, lView.Name)
+		lViewDFA.Export(filenameDFA, graphviz.XDOT)
 
 		// Updates the automata for the local view
 		lView.Automata = lViewDFA.Copy()
 	}
 
 	// At last extracts the Choreography Automata (also known as "global view")
-	finalCA := transforms.GenerateDCA(localViews)
-	finalCA.Export(fmt.Sprintf("%s/Choreography Automata.svg", *outputPath), graphviz.SVG)
+	finalCA := transforms.LocalViewsComposition(localViews)
+	finalCA.Export(fmt.Sprintf("%s/Choreography Automata.dot", *outputPath), graphviz.XDOT)
 }

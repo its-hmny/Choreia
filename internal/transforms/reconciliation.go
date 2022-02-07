@@ -18,7 +18,7 @@ import (
 	"github.com/its-hmny/Choreia/internal/data_structures/fsa"
 )
 
-type CompositionFSA *list.List // A list of (FrozenAutomata, FrozenAutomata) tuples
+type ProductFSA *list.List // A list of (FrozenAutomata, FrozenAutomata) tuples
 
 // A struct representing a "frozen" state of an FSA
 type FrozenFSA struct {
@@ -26,11 +26,12 @@ type FrozenFSA struct {
 	state     int            // The state on which the automata is frozen
 }
 
+// A wildcard variable used as second item in a couple when needed
 var wildcard = FrozenFSA{&ProjectionFSA{Name: "Wildcard"}, -1}
 
 // Utility function to iterate over every possible combination of transition (tA and tB) for
 // a given state of the Composition FSA which is a couple of states from different FSAs
-func forEachCoupleTransition(cFSA CompositionFSA, f func(A, B FrozenFSA, tA, tB fsa.Transition, toA, toB int)) {
+func forEachCoupleTransition(cFSA ProductFSA, f func(A, B FrozenFSA, tA, tB fsa.Transition, toA, toB int)) {
 	for _, item := range (*list.List)(cFSA).Values() {
 		// Preliminaries conversion and extraction
 		couple := item.(*set.Set)
@@ -66,7 +67,7 @@ func findCoupleId(list *list.List, toFind *set.Set) int {
 	return id
 }
 
-// Utility functions that creates a transition from every state that countains at least one
+// Utility functions that creates a transition from every state that contains at least one
 // element in the fromCouple to the state identified by destId and with newT transitions
 func createTransitions(syncFSA *fsa.FSA, couples *list.List, fromCouple *set.Set, destId int, newT fsa.Transition) {
 	couples.Each(func(currentId int, item interface{}) {
@@ -83,8 +84,8 @@ func createTransitions(syncFSA *fsa.FSA, couples *list.List, fromCouple *set.Set
 // Takes the deterministic version of the Local Views (or Projection Automata) and merges them
 // in one DCA that will represent the choreography as a whole (the global view). This is possible
 // by composing all the Local View's FSAs into one and then appply a Synchronization transform on it
-func GenerateDCA(localViews map[string]*ProjectionFSA) *fsa.FSA {
-	cFSA := fsaComposition(localViews)
+func LocalViewsComposition(localViews map[string]*ProjectionFSA) *fsa.FSA {
+	cFSA := fsaProduct(localViews)
 	fmt.Printf("CompositionAutomata has %d states\n\n", ((*list.List)(cFSA)).Size())
 
 	// Creates the entrypoint couples (main - 0, wildcard), the starting couple of the program
@@ -102,7 +103,7 @@ func GenerateDCA(localViews map[string]*ProjectionFSA) *fsa.FSA {
 // Takes two or more FSA given as input and returns the composition FSA of given automata
 // the returned automata is a FSA with m x n x ... z states and all the transitions of the
 // starting FSAs combined, every possible combination is only added once.
-func fsaComposition(localViews map[string]*ProjectionFSA) CompositionFSA {
+func fsaProduct(localViews map[string]*ProjectionFSA) ProductFSA {
 	// Creates a new list (type alias of CompositionFSA)
 	cAutomata := list.New()
 
@@ -141,7 +142,7 @@ func fsaComposition(localViews map[string]*ProjectionFSA) CompositionFSA {
 // Given a composition FSA and the entrypoint (the first state) for the first it precalculate
 // the state of the cFSA in which a synchronization occurs. this means it returns a subset of tuples
 // <state, state> in which 2 actor or local views interact between them
-func precalcSynchedCouples(cFSA CompositionFSA, entrypoint *set.Set) *list.List {
+func precalcSynchedCouples(cFSA ProductFSA, entrypoint *set.Set) *list.List {
 	// Creates the list with the synched couples
 	synchedCouples := list.New(entrypoint)
 
@@ -181,11 +182,11 @@ func precalcSynchedCouples(cFSA CompositionFSA, entrypoint *set.Set) *list.List 
 	return synchedCouples // Returns the "synched" couple list
 }
 
-// Iterates over the composition FSA and whenver it found a couple of state (and their respective FSA
-// & transtistions) that can be synchronized: 1) they make their own operations (e.g. Spawn) they make
+// Iterates over the composition FSA and whenever it found a couple of state (and their respective FSA
+// & transitions) that can be synchronized: 1) they make their own operations (e.g. Spawn) they make
 // opposite transition on the same channel (Send & Receive on x) then it links this couple with every other
 // couple in the synchronization FSA that can reach the current one.
-func fsaSynchronization(cFSA CompositionFSA, synchedCouples *list.List) *fsa.FSA {
+func fsaSynchronization(cFSA ProductFSA, synchedCouples *list.List) *fsa.FSA {
 	// Initializes the synchronized FSA
 	synchAutomata := fsa.New()
 
