@@ -103,7 +103,7 @@ func newEpsClosure(automata *fsa.FSA, states *set.Set) *set.Set {
 	return reachedStates
 }
 
-//Returns the set of reachable states from the closure (or set of state) "clos" with the given move
+// Returns the set of reachable states from the closure (or set of state) "clos" with the given move
 func getReachable(automata *fsa.FSA, clos *set.Set, move fsa.Transition) *set.Set {
 	// Init an empty list of states reachable
 	tReachable := set.New()

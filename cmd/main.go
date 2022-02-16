@@ -26,6 +26,7 @@ func main() {
 	inputFile := getopt.StringLong("input", 'i', "", "The .go file from which extract the Choreography Automata")
 	outputPath := getopt.StringLong("output", 'o', "./choreia.out", "The path to where the extracted data will be saved")
 	traceFlag := getopt.BoolLong("trace", 't', "Pretty prints on the console the AST", "false")
+	svgExportFlag := getopt.BoolLong("svg", 's', "Saves .svg images alongside the .dot file", "false")
 	showUsage := getopt.BoolLong("help", 'h', "Display this help message", "false")
 	getopt.Parse() // Parses the program arguments
 
@@ -60,6 +61,15 @@ func main() {
 		log.Fatal("Cannot extract Partial Automata, 'main' function metadata not found")
 	}
 
+	for _, funcMeta := range fileMetadata.FunctionMeta {
+		// Export the current function automata as .dot file
+		funcMeta.ScopeAutomata.Export(fmt.Sprintf("%s/%s.dot", *outputPath, funcMeta.Name), graphviz.XDOT)
+		// Additional export of .svg function automata
+		if svgExportFlag != nil && *svgExportFlag {
+			funcMeta.ScopeAutomata.Export(fmt.Sprintf("%s/%s.svg", *outputPath, funcMeta.Name), graphviz.SVG)
+		}
+	}
+
 	// Extracts the local views starting from the program entrypoint ("main" function)
 	localViews := transforms.GetLocalViews(mainMeta, fileMetadata)
 
@@ -79,9 +89,23 @@ func main() {
 
 		// Updates the automata for the local view
 		lView.Automata = lViewDFA.Copy()
+
+		// Additional export of .svg automata
+		if svgExportFlag != nil && *svgExportFlag {
+			filenameNFA := fmt.Sprintf("%s/NFA %s.svg", *outputPath, lView.Name)
+			lView.Automata.Export(filenameNFA, graphviz.SVG)
+
+			filenameDFA := fmt.Sprintf("%s/DFA %s.svg", *outputPath, lView.Name)
+			lViewDFA.Export(filenameDFA, graphviz.SVG)
+		}
 	}
 
 	// At last extracts the Choreography Automata (also known as "global view")
 	finalCA := transforms.LocalViewsComposition(localViews)
 	finalCA.Export(fmt.Sprintf("%s/Choreography Automata.dot", *outputPath), graphviz.XDOT)
+	// Additional export of .svg Choreography Automata
+	if svgExportFlag != nil && *svgExportFlag {
+		finalCA.Export(fmt.Sprintf("%s/Choreography Automata.svg", *outputPath), graphviz.SVG)
+
+	}
 }
