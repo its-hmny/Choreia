@@ -2,9 +2,10 @@
 // This file are distributed under the General Public License v 3.0.
 // A copy of abovesaid license can be found in the LICENSE file.
 
-// Package static_analysis declares the types used to represent metedata extracted from the Go source code.
-// The source code is transformed to an Abstract Syntax Tree via go/ast module and. Said AST is visited fully
-// and all the metadata needed are extractred then returned in a single aggregate struct.
+// Package static_analysis declares the types used to represent metadata extracted from the Go source.
+// The source code is transformed to an Abstract Syntax Tree via go/ast module.
+// Said AST is visited through the Visitor pattern all the metadata available are extractred
+// and agglomerated in a single comprehensive struct.
 //
 package static_analysis
 
@@ -18,13 +19,12 @@ import (
 
 // A FileMetadata contains the metadata available about a Go source file
 //
-// A struct containing all the metadata that the algorithm has been able to
-// extrapolate from the parsed file.
+// A struct containing all the metadata that the Visitor has been able to
+// gather from the parsed file. The data are structured hierarchically:
+// Module -> File -> Function -> Channels
 type FileMetadata struct {
-	// The channel declared and avaiable in the global scope
-	GlobalChanMeta map[string]ChanMetadata
-	// The top-level function declared in the file
-	FunctionMeta map[string]FuncMetadata
+	GlobalChanMeta map[string]ChanMetadata // The channel declared in the global scope
+	FunctionMeta   map[string]FuncMetadata // The top-level function declared in the file
 }
 
 // Adds the given metadata about some channel(s) to the FileMetadata struct
@@ -37,20 +37,6 @@ func (fm *FileMetadata) addChannelMeta(newChanMeta ...ChanMetadata) {
 		// Checks the validity of the current item
 		if channel.Name != "" && channel.Type != "" {
 			fm.GlobalChanMeta[channel.Name] = channel
-		}
-	}
-}
-
-// Adds the given metadata about a function(s) to the FileMetadata struct
-// In case of a function with the same name then the previous association
-// is overwritten although this should not happen since it's not possible to
-// use the same function name with different signature (overloading isn't allowed)
-func (fm *FileMetadata) addFunctionMeta(functionMetas ...FuncMetadata) {
-	// Adds the metadata association to the map
-	for _, function := range functionMetas {
-		// Checks the validity of the current item
-		if function.Name != "" {
-			fm.FunctionMeta[function.Name] = function
 		}
 	}
 }
@@ -71,10 +57,9 @@ func (fm FileMetadata) Visit(node ast.Node) ast.Visitor {
 		newChannels := parseGenDecl(stmt)
 		fm.addChannelMeta(newChannels...)
 		return nil
-	// Obvoiusly we want to extrapolate data about the declared function (and their action)
+	// Obviously we want to extrapolate data about the declared function (and their action)
 	case *ast.FuncDecl:
-		newFunction := parseFuncDecl(stmt)
-		fm.addFunctionMeta(newFunction)
+		parseFuncDecl(stmt, fm)
 		return nil
 	// Error handling case
 	case *ast.BadDecl, *ast.BadExpr, *ast.BadStmt:

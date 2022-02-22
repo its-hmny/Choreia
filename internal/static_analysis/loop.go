@@ -2,9 +2,10 @@
 // This file are distributed under the General Public License v 3.0.
 // A copy of abovesaid license can be found in the LICENSE file.
 
-// Package static_analysis declares the types used to represent metedata extracted from the Go source code.
-// The source code is transformed to an Abstract Syntax Tree via go/ast module and. Said AST is visited fully
-// and all the metadata needed are extractred then returned in a single aggregate struct.
+// Package static_analysis declares the types used to represent metadata extracted from the Go source.
+// The source code is transformed to an Abstract Syntax Tree via go/ast module.
+// Said AST is visited through the Visitor pattern all the metadata available are extractred
+// and agglomerated in a single comprehensive struct.
 //
 package static_analysis
 
@@ -17,17 +18,17 @@ import (
 // ----------------------------------------------------------------------------
 // Looping/Iteration constructs related parsing method
 
-// This function parses a ForStmt statement and saves the Transition(s) data extracted
+// This function parses a ForStmt statement and saves the transition(s) data extracted
 // in the given FuncMetadata argument. In case of error during execution no error is returned.
 func parseForStmt(stmt *ast.ForStmt, fm *FuncMetadata) {
 	// Parse the init statement at first and the condition (always executed at least one time)
 	ast.Walk(fm, stmt.Init)
-	ast.Walk(fm, stmt.Cond) // ? parse BinaryExpr to find transition inside
+	ast.Walk(fm, stmt.Cond) // ? Parse BinaryExpr to find transition inside
 	// Saves a local copy of the current id, all the branch will fork from it
 	forkStateId := fm.ScopeAutomata.GetLastId()
 
 	// Generate an eps-transition to represent the fork/branch (the iteration scope in the for loop)
-	// and add it as a transaction from the "fork point" saved before
+	// and add it as a transition from the "fork point" saved before
 	tEpsStart := fsa.Transition{Move: fsa.Eps, Label: "for-iteration-start"}
 	fm.ScopeAutomata.AddTransition(forkStateId, fsa.NewState, tEpsStart)
 
@@ -56,7 +57,7 @@ func parseRangeStmt(stmt *ast.RangeStmt, fm *FuncMetadata) {
 	// Checks if the iteratee identifier is a locally declared channel, eventually sets a flag
 	// this is needs because "ranging" over a channel is equal to receiving multiple time from it
 	if isIdent {
-		for _, chanMeta := range fm.ChanMeta { // ? add support for global channel
+		for _, chanMeta := range fm.ChanMeta {
 			if chanMeta.Name == iterateeIdent.Name {
 				matchFound = true
 			}
@@ -72,7 +73,7 @@ func parseRangeStmt(stmt *ast.RangeStmt, fm *FuncMetadata) {
 	forkStateId := fm.ScopeAutomata.GetLastId()
 
 	// Generate an eps-transition to represent the fork/branch (the iteration block in the loop)
-	// and add it as a transaction, if we're using range on a channel then the transition became
+	// and add it as a transition, if we're using range on a channel then the transition became
 	// a Recv transition since on channel this is the default overload of "range" keyword
 	if matchFound {
 		channelMeta := fm.ChanMeta[iterateeIdent.Name]

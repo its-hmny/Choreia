@@ -11,7 +11,7 @@ package fsa
 import "fmt"
 
 const (
-	// Transaction type enum
+	// Transition type enum
 	Call  MoveKind = "Call"
 	Empty MoveKind = "Empty"
 	Eps   MoveKind = "Epsilon"
