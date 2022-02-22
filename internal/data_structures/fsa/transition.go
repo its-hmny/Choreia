@@ -12,8 +12,8 @@ import "fmt"
 
 const (
 	// Transaction type enum
-	Empty MoveKind = "Empty"
 	Call  MoveKind = "Call"
+	Empty MoveKind = "Empty"
 	Eps   MoveKind = "Epsilon"
 	Recv  MoveKind = "Recv"
 	Send  MoveKind = "Send"
@@ -50,7 +50,7 @@ func (t Transition) String() string {
 	case Spawn:
 		return fmt.Sprintf("%q %s", '\u22C1', t.Label)
 	case Empty:
-		return fmt.Sprintf("%s", t.Label)
+		return t.Label
 	default:
 		return fmt.Sprintf("%q %s", '\u2048', t.Label)
 	}
