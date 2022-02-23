@@ -2,9 +2,10 @@
 // This file are distributed under the General Public License v 3.0.
 // A copy of abovesaid license can be found in the LICENSE file.
 
-// Package static_analysis declares the types used to represent metedata extracted from the Go source code.
-// The source code is transformed to an Abstract Syntax Tree via go/ast module and. Said AST is visited fully
-// and all the metadata needed are extractred then returned in a single aggregate struct.
+// Package static_analysis declares the types used to represent metadata extracted from the Go source.
+// The source code is transformed to an Abstract Syntax Tree via go/ast module.
+// Said AST is visited through the Visitor pattern all the metadata available are extractred
+// and agglomerated in a single comprehensive struct.
 //
 package static_analysis
 
@@ -14,8 +15,8 @@ import (
 )
 
 // This function parses an AssignStmt statement and evaluates all the possible cases for it.
-// In particular this statement can have a recv from a channel, a function call or a channel init
-// all three with the return value then assigned to a variable/identifier
+// In particular this statement can contain a receive operation from a channel, a function call
+// or the initialization of a channel.
 func parseAssignStmt(stmt *ast.AssignStmt, fm *FuncMetadata) {
 	// Check that the number of rvalue are the same of lvalue (values assignments) in the statement
 	if len(stmt.Lhs) != len(stmt.Rhs) {

@@ -2,9 +2,10 @@
 // This file are distributed under the General Public License v 3.0.
 // A copy of abovesaid license can be found in the LICENSE file.
 
-// Package static_analysis declares the types used to represent metedata extracted from the Go source code.
-// The source code is transformed to an Abstract Syntax Tree via go/ast module and. Said AST is visited fully
-// and all the metadata needed are extractred then returned in a single aggregate struct.
+// Package static_analysis declares the types used to represent metadata extracted from the Go source.
+// The source code is transformed to an Abstract Syntax Tree via go/ast module.
+// Said AST is visited through the Visitor pattern all the metadata available are extractred
+// and agglomerated in a single comprehensive struct.
 //
 package static_analysis
 
@@ -18,7 +19,6 @@ import (
 const (
 	Function ArgType = iota // Possible value of FuncArg.type
 	Channel
-
 	anonymousFunc = "anonymousFunc" // Constant to identify anonymous function
 )
 
@@ -43,7 +43,7 @@ type FuncArg struct {
 	Type   ArgType // The type of the argument (only Function or Channel)
 }
 
-type ArgType int
+type ArgType int // Enum of the arguments type that we're interested in
 
 // Adds the given metadata about some channel(s) to the FuncMetadata struct
 // In case a channel with the same name already exist then the previous association
@@ -131,10 +131,10 @@ func (fm FuncMetadata) Visit(node ast.Node) ast.Visitor {
 // ----------------------------------------------------------------------------
 // Function related parsing method
 
-// This function parses a FuncDecl statement and saves the data extracted in a
-// FuncMetadata struct. In case of error during execution (external or non Go function)
-// a zero value of abovesaid struct is returned (no error returned).
-func parseFuncDecl(stmt *ast.FuncDecl) FuncMetadata {
+// This function parses a FuncDecl statement and saves the data extracted in a FuncMetadata struct.
+// In case of strange condition (function declared in another module or C function called fromGo code)
+// then no metadata are extracted and the execution will resume parsing the global scope.
+func parseFuncDecl(stmt *ast.FuncDecl, fm FileMetadata) {
 	// Retrieve function name and arguments
 	funcName := stmt.Name.Name
 	funcArgs := stmt.Type.Params.List
@@ -147,10 +147,16 @@ func parseFuncDecl(stmt *ast.FuncDecl) FuncMetadata {
 		ScopeAutomata: fsa.New(),
 	}
 
+	// Copies the global scope channel in the nested scope of the function.
+	// Simple implementation of scope inheritance
+	for name, meta := range fm.GlobalChanMeta {
+		metadata.ChanMeta[name] = meta
+	}
+
 	// If the current is an external (non Go) function then is skipped since
 	// it isn't useful in order to evaluate the choreography of the automon
 	if stmt.Body == nil {
-		return FuncMetadata{} // Returns zero value of the struct
+		return
 	}
 
 	// If the function has arguments we search for channels or callback/functions since
@@ -186,16 +192,15 @@ func parseFuncDecl(stmt *ast.FuncDecl) FuncMetadata {
 	metadata.ScopeAutomata.FinalStates.Add(metadata.ScopeAutomata.GetLastId())
 
 	// At last all the data extracted is returned
-	return metadata
+	fm.FunctionMeta[funcName] = metadata
 }
 
-// This function parses a GoStmt statement and saves the Transition data extracted
-//  in the given FuncMetadata argument. In case of error during execution no error is returned.
+// This function parses a GoStmt statement and saves the transition data extracted
+// in the given FuncMetadata argument. In case of error during execution no error is returned.
 func parseGoStmt(stmt *ast.GoStmt, fm *FuncMetadata) {
-	// Determines if GoStmt spawn a Go routine from declared
-	// function or an anonymous function is spawned
-	funcIdent, isFuncIdent := stmt.Call.Fun.(*ast.Ident)
-	_, isFuncAnonymous := stmt.Call.Fun.(*ast.FuncLit)
+	// Determines if GoStmt spawns a Go routine from declared or anonymous function
+	funcIdent, isFuncIdent := stmt.Call.Fun.(*ast.Ident) // Declared function
+	_, isFuncAnonymous := stmt.Call.Fun.(*ast.FuncLit)   // Anonymous function
 
 	// Then extracts the data accordingly
 	if isFuncIdent {
@@ -203,7 +208,7 @@ func parseGoStmt(stmt *ast.GoStmt, fm *FuncMetadata) {
 
 		// Parses the GoStmt arguments looking for channels and saves the "actual" argument to list
 		// in the Transition. Later this channels will be inlined during the generation of the automaton
-		// ! Remove starting duplicate at line 240
+		// ! Remove duplicate at line 253
 		for i, arg := range stmt.Call.Args {
 			argIdent, isIdent := arg.(*ast.Ident)
 			if isIdent {
@@ -219,16 +224,17 @@ func parseGoStmt(stmt *ast.GoStmt, fm *FuncMetadata) {
 		// At last add the transition (with the payload) to the ScopeAutomata
 		fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tSpawn)
 	} else if isFuncAnonymous {
+		// ToDo: This functionality is not yet implemented
 		anonFuncName := fmt.Sprintf("%s-%s", anonymousFunc, fm.Name)
 		tSpawn := fsa.Transition{Move: fsa.Spawn, Label: anonFuncName}
 		fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tSpawn)
-		// ? Add parent availableChan
+		// ? Add parent ChanMeta (scope inheritance)
 		// ? Add parse arguments (different from above)
-		// ? Should parse body of funcLiteral (?)
+		// ? Should parse body of funcLiteral
 	}
 }
 
-// This function parses a CallExpr statement and saves the Transition data extracted
+// This function parses a CallExpr statement and saves the transition data extracted
 // in the given FuncMetadata argument. In case of error during execution no error is returned.
 func parseCallExpr(expr *ast.CallExpr, fm *FuncMetadata) {
 	// Tries to extract the function name (identifier), else throw an exception
@@ -239,12 +245,12 @@ func parseCallExpr(expr *ast.CallExpr, fm *FuncMetadata) {
 		return
 	}
 
-	// Creates a valid transaction struct
+	// Creates a valid transition struct
 	tCall := fsa.Transition{Move: fsa.Call, Label: funcIdent.Name}
 
 	// Parses the CallExpr arguments looking for channels and saves the "actual" argument to list
 	// in the Transition. Later this channels will be inlined during the generation of the automaton
-	// ! Remove starting duplicate at line 199
+	// ! Remove duplicate at line 211
 	for i, arg := range expr.Args {
 		argIdent, isIdent := arg.(*ast.Ident)
 		if isIdent {

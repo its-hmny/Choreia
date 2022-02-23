@@ -2,9 +2,10 @@
 // This file are distributed under the General Public License v 3.0.
 // A copy of abovesaid license can be found in the LICENSE file.
 
-// Package static_analysis declares the types used to represent metedata extracted from the Go source code.
-// The source code is transformed to an Abstract Syntax Tree via go/ast module and. Said AST is visited fully
-// and all the metadata needed are extractred then returned in a single aggregate struct.
+// Package static_analysis declares the types used to represent metadata extracted from the Go source.
+// The source code is transformed to an Abstract Syntax Tree via go/ast module.
+// Said AST is visited through the Visitor pattern all the metadata available are extractred
+// and agglomerated in a single comprehensive struct.
 //
 package static_analysis
 
@@ -22,20 +23,21 @@ import (
 
 // A ChanMetadata contains the metadata available about a Go channel
 //
-// A struct containing all the metadata that the algorithm has been able to
-// extrapolate from a channel declaration or assignment. Only the channel declared
-// in the file by the user are evaluated (channel returned from external functions are ignored)
+// A struct containing all the metadata that the Visitor algorithm has been able to extrapolate.
+// This kind of date are derived both from channel declaration and assignment.
+// Only the channel declared in the file are evaluated (channel returned from function call or
+// imported from another module are ignored)
 type ChanMetadata struct {
-	Name  string
-	Type  string
-	Async bool
+	Name  string // The name of the channel
+	Type  string // The type of message the channel supports (int, string, interface{}, ...)
+	Async bool   // Is the channel unbuffered (synchronous) or buffered (asynchronous)
 }
 
 // ----------------------------------------------------------------------------
 // Channel related parsing method
 
-// This function parses a SendStmt statement and saves the Transition(s) data extracted
-// in the given FuncMetadata argument. In case of error during execution no error is returned.
+// This function parses a SendStmt statement and saves the transition(s) extracted
+// in the given FuncMetadata argument. In case of error the whole execution is stopped.
 func parseSendStmt(stmt *ast.SendStmt, fm *FuncMetadata) {
 	chanIdent, isIdent := stmt.Chan.(*ast.Ident)
 	if isIdent {
@@ -49,18 +51,17 @@ func parseSendStmt(stmt *ast.SendStmt, fm *FuncMetadata) {
 
 // This function parses a UnaryExpr statement and saves the Transition(s) data extracted
 // in the given FuncMetadata argument. In case of error during execution no error is returned.
-// It search for Recv transition (receive from a channel)
 func parseRecvStmt(expr *ast.UnaryExpr, fm *FuncMetadata) {
 	// Tries to extract the identifier of the expression
 	chanIdent, isIdent := expr.X.(*ast.Ident)
 
-	// If an ident isn't found or the token is not "<-" then we return
-	// the current isn't a ReceiveStmt
+	// If an ident isn't found or the token is not "<-" then we return.
+	// This is means the current op we're parsing isn't a ReceiveStmt
 	if !isIdent || expr.Op != token.ARROW {
 		return
 	}
 
-	// Creates a valid transaction struct
+	// Retrieves the channel metadata and initializes a valid transition
 	channelMeta := fm.ChanMeta[chanIdent.Name]
 	tRecv := fsa.Transition{Move: fsa.Recv, Label: chanIdent.Name, Payload: channelMeta}
 	fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tRecv)
@@ -71,9 +72,9 @@ func parseRecvStmt(expr *ast.UnaryExpr, fm *FuncMetadata) {
 func parseSelectStmt(stmt *ast.SelectStmt, fm *FuncMetadata) {
 	// Saves a local copy of the current id, all the branch will fork from it
 	currentAutomataId := fm.ScopeAutomata.GetLastId()
-	// The id of the state in which all the nested scopes will be merged, will converge
-	// when -2 is to be considered uninitialized , will be initialized correctly on first iteration
-	mergeStateId := fsa.NewState
+	// The id of the state in which all the nested scopes will converge.
+	// It will be initialized correctly after the first iteration
+	mergeStateId := fsa.Unknown
 
 	for i, bodyStmt := range stmt.Body.List {
 		// Convert the bodyStmt to a CommClause one, this is always possible at the moment
@@ -81,19 +82,19 @@ func parseSelectStmt(stmt *ast.SelectStmt, fm *FuncMetadata) {
 		commClause := bodyStmt.(*ast.CommClause)
 
 		// Generate an eps-transition to represent the fork/branch (the cases in the select)
-		// and add it as a transaction from the "branch point" saved before
+		// and add it as a transition from the "branching point" saved before
 		startLabel := fmt.Sprintf("select-case-%d-start", i)
 		tEpsStart := fsa.Transition{Move: fsa.Eps, Label: startLabel}
 		fm.ScopeAutomata.AddTransition(currentAutomataId, fsa.NewState, tEpsStart)
 
-		// Parses the clause (case stmt) before and then parses the nested block/scopes
+		// Parses the CaseClause, then parses the nested block/scopes
 		ast.Walk(fm, commClause)
 
 		// Generates a transition to return/merge to the "main" scope
 		endLabel := fmt.Sprintf("select-case-%d-end", i)
 		tEpsEnd := fsa.Transition{Move: fsa.Eps, Label: endLabel}
 
-		if mergeStateId == fsa.NewState {
+		if mergeStateId == fsa.Unknown {
 			// Saves the id, of the merge state for use in next iterations
 			fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tEpsEnd)
 			mergeStateId = fm.ScopeAutomata.GetLastId()
@@ -102,18 +103,18 @@ func parseSelectStmt(stmt *ast.SelectStmt, fm *FuncMetadata) {
 		}
 	}
 
-	// Set the new root of the PartialAutomata, from which all future transition will start
+	// Set the new root of the Automaton, from which all future transition will start
 	fm.ScopeAutomata.SetRootId(mergeStateId)
 }
 
-// Specific function to extrapolate channel metadata from a DeclStmt statement
+// Specific function to extrapolate channel metadata from a DeclStmt statement.
 // At the moment of writing this should always be possible since only GenDecl
-// satisfy the Decl interface however this may change in future releases of Go
+// satisfies the Decl interface however this may change in future releases of Go
 func parseDeclStmt(stmt *ast.DeclStmt, fm *FuncMetadata) {
 	// Tries to cast the current statement's declaration to a GenDecl.
 	genDecl, isGenDecl := stmt.Decl.(*ast.GenDecl)
 
-	if !isGenDecl {
+	if !isGenDecl { // This should never happen
 		log.Fatalf("Couldn't get the GenDecl statement from the DeclStmt at line %d\n", stmt.Pos())
 	}
 
@@ -121,25 +122,26 @@ func parseDeclStmt(stmt *ast.DeclStmt, fm *FuncMetadata) {
 	fm.addChannels(chanMeta...)
 }
 
-// This function tries to extract metadata about a channel from the GenDecl subtree
-// since is possible to declare more than value the function returns a slice of ChanMetadata
-// If errors are encountered at any point the function returns nil
+// This function tries to extract metadata about a channel from the GenDecl subtree.
+// Since is possible to declare more variables in a single GenDecl statement the function
+// returns a slice of ChanMetadata. If errors are encountered at any point the function returns nil
 func parseGenDecl(genDecl *ast.GenDecl) []ChanMetadata {
-	// A Slice containing all the metadata retrieved about the channel declared
+	// Initializes the slice where al the data extracted will be aggregated
 	bufferMetadata := []ChanMetadata{}
 
-	// Iterates over the list of ident-value association
+	// Iterates over the list of Ident <-> Value association
 	for _, specVal := range genDecl.Specs {
 		valueSpec, isValueSpec := specVal.(*ast.ValueSpec)
 
 		if (genDecl.Tok != token.CONST && genDecl.Tok != token.VAR) || !isValueSpec {
-			// When the token is VAR or CONST then Specs is a ValueSpec (with a value assigned)
-			// this is what we're interested in when looking for channel declaration
+			// When the token is VAR or CONST then Specs is a ValueSpec (with a value assigned).
+			// This isn't what we're interested in when looking for channel declaration
 			return nil
 		}
 
 		// Now iterates over the assignment statements
 		for i := range valueSpec.Values {
+			// Get the right-hand-side and left-hand-side of the expression
 			lVal, rVal := valueSpec.Names[i], valueSpec.Values[i]
 			callExpr, isCallExpr := rVal.(*ast.CallExpr)
 			// If the Rhs expression is a function call then is possible is a "make call"
@@ -154,7 +156,7 @@ func parseGenDecl(genDecl *ast.GenDecl) []ChanMetadata {
 }
 
 // This function tries to parse a "make" function call in order to extract metadata
-// about the initialized channel, if at any point errors are encountered then the
+// about the initialized channel. If at any point errors are encountered then the
 // function returns the zero value of the ChanMetadata struct
 func parseMakeCall(callExpr *ast.CallExpr, chanName string) ChanMetadata {
 	// Tries to extract the function name (identifier), else return a zero value
