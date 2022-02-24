@@ -2,14 +2,13 @@
 // This file are distributed under the General Public License v 3.0.
 // A copy of abovesaid license can be found in the LICENSE file.
 
-// Package transforms declares the types and functions used to represent and work with
-// ProjectionAutomata (also referenced as Local Views) for a given Goroutine. They also implements
-// general pourpose algorithm for Finite State Automata (FSA) such as Subset Construction Algorithm
+// Package transforms declares the types and functions used to transform and work with some type of FSA.
+// Come of the transformation implemented here are standard such as determinization (Subset Construction),
+// minimization but more are specifically related to Choreia (GoroutineFSA extraction & Composition)
 //
 package transforms
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/its-hmny/Choreia/internal/data_structures/fsa"
@@ -21,36 +20,181 @@ var nProjectionExtracted = 0
 const nameTemplate = "%s (%d)"
 
 // -------------------------------------------------------------------------------------------
-// ProjectionAutomata
+// GoroutineFSA
 
 // A FSA that represents the execution flow of a single Goroutine (identified by its own name)
-type ProjectionFSA struct {
-	Name     string   // An identifier for the Automata
-	Automata *fsa.FSA // The FSA itself
+// this will be used in the future phases as a local view for the whole choreography.
+// This means that this FSA will provide an "isolated" view of the choreography from the perspective
+// of the Goroutine that takes part in it (almost like a projection of the whole choreography)
+type GoroutineFSA struct {
+	Name      string   // An identifier for the Automata
+	Automaton *fsa.FSA // The FSA itself
 }
 
+func ExtractGoroutineFSA(file meta.FileMetadata) map[string]*GoroutineFSA {
+	inlinedCache := make(map[string]*fsa.FSA)
+
+	for _, function := range file.FunctionMeta {
+		// Cache hit: The current automaton has already been linearized.
+		if inlinedCache[function.Name] != nil {
+			// This means its function calls in the automaton have been already inlined and the latter
+			// contains (as subgraphs) the FSA of the function called (just like compiler inlining)
+			continue
+		}
+
+		// Cache miss: We must linearize the current automaton
+		linearizeFSA(function, file, inlinedCache)
+	}
+
+	// ToDO: Complete the second phase
+	// Extracts all the GoroutineFSA starting from the "main" function
+	// which is the entrypoint for the Go program
+	return make(map[string]*GoroutineFSA)
+}
+
+func linearizeFSA(function meta.FuncMetadata, file meta.FileMetadata, cache map[string]*fsa.FSA) {
+	// Makes an independent copy that can be freely modified
+	copyAutomaton := function.Automaton.Copy()
+
+	copyAutomaton.ForEachTransition(func(from, to int, t fsa.Transition) {
+		if t.Move != fsa.Call { // Ignores all non "Call" type transition
+			return
+		}
+
+		// Checks if the called function has been parsed, some function call such as
+		// append() or make() are not "injected" and no metadata is available
+		calledMeta, exist := file.FunctionMeta[t.Label]
+
+		// If the function doesn't exist the transition is overwritten with an eps transition
+		if !exist {
+			newT := fsa.Transition{Move: fsa.Eps, Label: "unknown-function-call"}
+			copyAutomaton.RemoveTransition(from, to, t)
+			copyAutomaton.AddTransition(from, to, newT)
+			return
+		}
+
+		// Cache miss: we linearize the called function and we add it to the cache
+		// The update of the cache is done by the recursive call
+		if cache[t.Label] == nil {
+			linearizeFSA(calledMeta, file, cache)
+		}
+
+		// Get a reference to the linearized automaton in cache
+		calledFuncAutomaton := cache[t.Label]
+		// Get a reference to the list of actual arguments and formal ones
+		formalArgs := calledMeta.InlineArgs
+		actualArgs, _ := t.Payload.([]meta.FuncArg)
+		// Get a reference to the channels metadata in the caller scope
+		channelInfo := function.ChanMeta
+
+		// Finds and replace transition with subject a formal parameter and replaces
+		// them with the same transition but with a reference to the actual argument
+		replaced := argumentSubstitution(formalArgs, actualArgs, calledFuncAutomaton, channelInfo)
+
+		// Expands as a subgraph the called function FSA in place of the transition t
+		// this process is really similar to function inlining a technique used in compilers
+		// to avoid function call overhead and the allocation of an Activation Record
+		inlineAutomata(copyAutomaton, from, to, t, replaced)
+	})
+
+	// Adds the fully linearized automaton to the cache
+	cache[function.Name] = copyAutomaton
+}
+
+func argumentSubstitution(formal, actual []meta.FuncArg, automaton *fsa.FSA, chanMeta map[string]meta.ChanMetadata) *fsa.FSA {
+	// Makes a copy that can be freely modified
+	automatonCopy := automaton.Copy()
+
+	// Bails out at the first discrepancy blocking the execution
+	if len(formal) != len(actual) {
+		log.Fatalf("Couldn't expand arguments: formal %d but actual %d\n", len(formal), len(actual))
+	}
+
+	// Expands the actual arguments with the positional ones
+	for _, actualArg := range actual {
+		for _, funcArg := range formal {
+			// Tries to find a match beetwen the actual argument and the positional argument
+			if funcArg.Offset != actualArg.Offset || funcArg.Type != actualArg.Type {
+				continue
+			}
+
+			// If such match is found then all the transition in the automataCopy that references
+			// that "formal" argument are replaced with transition to the "actual" argument
+			automatonCopy.ForEachTransition(func(from, to int, t fsa.Transition) {
+				if funcArg.Type == meta.Channel && t.Label == funcArg.Name && (t.Move == fsa.Recv || t.Move == fsa.Send) {
+					// Creates a new transition that will overwrite the old one
+					// (the one that references the formal argument)
+					newT := fsa.Transition{
+						Move:    t.Move,
+						Label:   actualArg.Name,
+						Payload: chanMeta[actualArg.Name],
+					}
+
+					// Replace the transitions
+					automatonCopy.RemoveTransition(from, to, t)
+					automatonCopy.AddTransition(from, to, newT)
+				}
+
+				// ? Handle funcArg.Type == Function as well
+			})
+		}
+	}
+
+	return automatonCopy
+}
+
+// This function expands a graph in place of an transition. Since in our case every
+// Automata/Graph has only one initial and final state then we simply copy the other graph
+// state by state and transition by transition and then we link the copy to the "from" and "to" states
+func inlineAutomata(root *fsa.FSA, from, to int, t fsa.Transition, other *fsa.FSA) {
+	// First of all remove the old call transition
+	root.RemoveTransition(from, to, t)
+
+	// Count the number of states, in order to extract an offset
+	offset := 0
+	root.ForEachState(func(_ int) { offset++ })
+
+	// Copies the "other" graph state, applying the offset to each id
+	other.ForEachTransition(func(from, to int, t fsa.Transition) {
+		root.AddTransition(from+offset, to+offset, t)
+	})
+
+	// Links the initial state of "other" FSA with the "root" FSA via eps transition
+	tExpansionStart := fsa.Transition{Move: fsa.Eps, Label: "start-call-expansion"}
+	root.AddTransition(from, offset, tExpansionStart)
+
+	// Links every final/accepting states of the other FSA with the "root" via eps transition
+	for _, item := range other.FinalStates.Values() {
+		finalStateId := item.(int)
+		tExpansionEnd := fsa.Transition{Move: fsa.Eps, Label: "end-call-expansion"}
+		root.AddTransition(finalStateId+offset, to, tExpansionEnd)
+	}
+}
+
+/*
+! This all need to be refactored
 // Extracts the Projection Automata (or "local view") for the given FuncMeta.
 // The ScopeAutomata of said function is used as entry point of the Projection CA.
 // Every call to another function is inlined in the local view.
 // When a new GoRoutine is spawned during the execution flow a new local view is generated.
 // Both Call and Spawn operation require expansion of formal arguments with actual ones
-func GetLocalViews(function meta.FuncMetadata, file meta.FileMetadata) map[string]*ProjectionFSA {
+func GetLocalViews(function meta.FuncMetadata, file meta.FileMetadata) map[string]*GoroutineFSA {
 	// Creates the Projection Automata for the current GoRoutine
-	current := ProjectionFSA{
-		Name:     fmt.Sprintf(nameTemplate, function.Name, nProjectionExtracted),
-		Automata: function.ScopeAutomata.Copy(), // Makes a full independent copy of the funcMeta.ScopeAutomata
+	current := GoroutineFSA{
+		Name:      fmt.Sprintf(nameTemplate, function.Name, nProjectionExtracted),
+		Automaton: function.ScopeAutomata.Copy(), // Makes a full independent copy of the funcMeta.ScopeAutomata
 	}
 
 	nProjectionExtracted++
-	extractedList := map[string]*ProjectionFSA{current.Name: &current}
+	extractedList := map[string]*GoroutineFSA{current.Name: &current}
 
 	// Iterates over each transition in the ScopeAutomata
 	function.ScopeAutomata.ForEachTransition(func(from, to int, t fsa.Transition) {
 		switch t.Move {
 		case fsa.Call:
-			inlineCallTransition(file, current.Automata, from, to, t)
+			inlineCallTransition(file, current.Automaton, from, to, t)
 		case fsa.Spawn:
-			for key, pAutomata := range extractSpawnTransition(file, current.Automata, from, to, t) {
+			for key, pAutomata := range extractSpawnTransition(file, current.Automaton, from, to, t) {
 				extractedList[key] = pAutomata
 			}
 		}
@@ -84,7 +228,7 @@ func inlineCallTransition(file meta.FileMetadata, root *fsa.FSA, from, to int, t
 // Hansles the Spawn transition in a local view (or Projection Automata), the local view of the newly spawned
 // is extracted with eventually the his "child" Goroutine and then the transition is updated with a reference
 // to the ProjectionAutomata struct of the spawned Goroutine
-func extractSpawnTransition(file meta.FileMetadata, root *fsa.FSA, from, to int, t fsa.Transition) map[string]*ProjectionFSA {
+func extractSpawnTransition(file meta.FileMetadata, root *fsa.FSA, from, to int, t fsa.Transition) map[string]*GoroutineFSA {
 	// Tries to retrieve the called function metadata from the file
 	calledFunc, hasMeta := file.FunctionMeta[t.Label]
 
@@ -152,33 +296,4 @@ func replaceActualArgs(t fsa.Transition, calledFunc meta.FuncMetadata) *fsa.FSA 
 	}
 
 	return calledAutomataCp
-}
-
-// This function expands a graph in place of an transition. Since in our case every
-// Automata/Graph has only one initial and final state then we simply copy the other graph
-// state by state and transition by transition and then we link the copy to the "from" and "to" states
-func inlineAutomata(root *fsa.FSA, from, to int, t fsa.Transition, other *fsa.FSA) {
-	// First of all remove the old call transition
-	root.RemoveTransition(from, to, t)
-
-	// Count the number of states, in order to extract an offset
-	offset := 0
-	root.ForEachState(func(_ int) { offset++ })
-
-	// Copies the "other" graph state, applying the offset to each id
-	other.ForEachTransition(func(from, to int, t fsa.Transition) {
-		root.AddTransition(from+offset, to+offset, t)
-	})
-
-	// Links the initial state of "other" FSA with the "root" FSA via eps transition
-	tExpansionStart := fsa.Transition{Move: fsa.Eps, Label: "start-call-expansion"}
-	root.AddTransition(from, offset, tExpansionStart)
-
-	// Links every final/accepting states of the other FSA with the "root" via eps transition
-	for _, item := range other.FinalStates.Values() {
-		finalStateId := item.(int)
-		tExpansionEnd := fsa.Transition{Move: fsa.Eps, Label: "end-call-expansion"}
-		root.AddTransition(finalStateId+offset, to, tExpansionEnd)
-	}
-
-}
+}*/

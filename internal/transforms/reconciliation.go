@@ -2,9 +2,9 @@
 // This file are distributed under the General Public License v 3.0.
 // A copy of abovesaid license can be found in the LICENSE file.
 
-// Package transforms declares the types and functions used to represent and work with
-// ProjectionAutomata (also referenced as Local Views) for a given Goroutine. They also implements
-// general pourpose algorithm for Finite State Automata (FSA) such as Subset Construction Algorithm
+// Package transforms declares the types and functions used to transform and work with some type of FSA.
+// Come of the transformation implemented here are standard such as determinization (Subset Construction),
+// minimization but more are specifically related to Choreia (GoroutineFSA extraction & Composition)
 //
 package transforms
 
@@ -22,12 +22,12 @@ type ProductFSA *list.List // A list of (FrozenAutomata, FrozenAutomata) tuples
 
 // A struct representing a "frozen" state of an FSA
 type FrozenFSA struct {
-	localView *ProjectionFSA // The "frozen" Automata
-	state     int            // The state on which the automata is frozen
+	localView *GoroutineFSA // The "frozen" Automata
+	state     int           // The state on which the automata is frozen
 }
 
 // A wildcard variable used as second item in a couple when needed
-var wildcard = FrozenFSA{&ProjectionFSA{Name: "Wildcard"}, -1}
+var wildcard = FrozenFSA{&GoroutineFSA{Name: "Wildcard"}, -1}
 
 // Utility function to iterate over every possible combination of transition (tA and tB) for
 // a given state of the Composition FSA which is a couple of states from different FSAs
@@ -39,8 +39,8 @@ func forEachCoupleTransition(cFSA ProductFSA, f func(A, B FrozenFSA, tA, tB fsa.
 		frozenA := values[0].(FrozenFSA)
 		frozenB := values[1].(FrozenFSA)
 
-		frozenA.localView.Automata.ForEachTransition(func(fromA, toA int, tA fsa.Transition) {
-			frozenB.localView.Automata.ForEachTransition(func(fromB, toB int, tB fsa.Transition) {
+		frozenA.localView.Automaton.ForEachTransition(func(fromA, toA int, tA fsa.Transition) {
+			frozenB.localView.Automaton.ForEachTransition(func(fromB, toB int, tB fsa.Transition) {
 				if fromA != frozenA.state || fromB != frozenB.state {
 					return
 				}
@@ -84,7 +84,7 @@ func createTransitions(syncFSA *fsa.FSA, couples *list.List, fromCouple *set.Set
 // Takes the deterministic version of the Local Views (or Projection Automata) and merges them
 // in one DCA that will represent the choreography as a whole (the global view). This is possible
 // by composing all the Local View's FSAs into one and then appply a Synchronization transform on it
-func LocalViewsComposition(localViews map[string]*ProjectionFSA) *fsa.FSA {
+func LocalViewsComposition(localViews map[string]*GoroutineFSA) *fsa.FSA {
 	cFSA := fsaProduct(localViews)
 	fmt.Printf("CompositionAutomata has %d states\n\n", ((*list.List)(cFSA)).Size())
 
@@ -103,7 +103,7 @@ func LocalViewsComposition(localViews map[string]*ProjectionFSA) *fsa.FSA {
 // Takes two or more FSA given as input and returns the composition FSA of given automata
 // the returned automata is a FSA with m x n x ... z states and all the transitions of the
 // starting FSAs combined, every possible combination is only added once.
-func fsaProduct(localViews map[string]*ProjectionFSA) ProductFSA {
+func fsaProduct(localViews map[string]*GoroutineFSA) ProductFSA {
 	// Creates a new list (type alias of CompositionFSA)
 	cAutomata := list.New()
 
@@ -116,8 +116,8 @@ func fsaProduct(localViews map[string]*ProjectionFSA) ProductFSA {
 				continue
 			}
 
-			lView.Automata.ForEachState(func(lViewId int) {
-				otherView.Automata.ForEachState(func(otherViewId int) {
+			lView.Automaton.ForEachState(func(lViewId int) {
+				otherView.Automaton.ForEachState(func(otherViewId int) {
 					// Creates the "frozen" instances (automata + state in which is frozen)
 					frozenA := FrozenFSA{lView, lViewId}
 					frozenB := FrozenFSA{otherView, otherViewId}

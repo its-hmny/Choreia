@@ -55,32 +55,26 @@ func main() {
 	// Parses and extracts the metadata from the given file
 	fileMetadata := static_analysis.ExtractMetadata(*inputFile, traceOpts)
 
-	// Retrieves the "main" function metadata (the entrypoint of the "root" Goroutine)
-	mainMeta, exist := fileMetadata.FunctionMeta["main"]
-	if !exist {
-		log.Fatal("Cannot extract Partial Automata, 'main' function metadata not found")
-	}
-
 	for _, funcMeta := range fileMetadata.FunctionMeta {
 		// Export the current function automata as .dot file
-		funcMeta.ScopeAutomata.Export(fmt.Sprintf("%s/%s.dot", *outputPath, funcMeta.Name), graphviz.XDOT)
+		funcMeta.Automaton.Export(fmt.Sprintf("%s/%s.dot", *outputPath, funcMeta.Name), graphviz.XDOT)
 		// Additional export of .svg function automata
 		if svgExportFlag != nil && *svgExportFlag {
-			funcMeta.ScopeAutomata.Export(fmt.Sprintf("%s/%s.svg", *outputPath, funcMeta.Name), graphviz.SVG)
+			funcMeta.Automaton.Export(fmt.Sprintf("%s/%s.svg", *outputPath, funcMeta.Name), graphviz.SVG)
 		}
 	}
 
 	// Extracts the local views starting from the program entrypoint ("main" function)
-	localViews := transforms.GetLocalViews(mainMeta, fileMetadata)
+	localViews := transforms.ExtractGoroutineFSA(fileMetadata)
 
 	// For each local view of the Choreography Automata applies transformations (determinization, minimization)
 	for _, lView := range localViews {
 		// Exports the local view (NFA version)
 		filenameNFA := fmt.Sprintf("%s/NFA %s.dot", *outputPath, lView.Name)
-		lView.Automata.Export(filenameNFA, graphviz.XDOT)
+		lView.Automaton.Export(filenameNFA, graphviz.XDOT)
 
 		// Determinization of the local view FSA
-		lViewDFA := transforms.SubsetConstruction(lView.Automata)
+		lViewDFA := transforms.SubsetConstruction(lView.Automaton)
 		// TODO: Add minimization of the DFA
 
 		// Constructs and exports the local view (DFA version)
@@ -88,12 +82,12 @@ func main() {
 		lViewDFA.Export(filenameDFA, graphviz.XDOT)
 
 		// Updates the automata for the local view
-		lView.Automata = lViewDFA.Copy()
+		lView.Automaton = lViewDFA.Copy()
 
 		// Additional export of .svg automata
 		if svgExportFlag != nil && *svgExportFlag {
 			filenameNFA := fmt.Sprintf("%s/NFA %s.svg", *outputPath, lView.Name)
-			lView.Automata.Export(filenameNFA, graphviz.SVG)
+			lView.Automaton.Export(filenameNFA, graphviz.SVG)
 
 			filenameDFA := fmt.Sprintf("%s/DFA %s.svg", *outputPath, lView.Name)
 			lViewDFA.Export(filenameDFA, graphviz.SVG)
