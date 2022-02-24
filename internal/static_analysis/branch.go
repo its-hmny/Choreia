@@ -27,40 +27,40 @@ func parseIfStmt(stmt *ast.IfStmt, fm *FuncMetadata) {
 
 	// Saves a local copy of the current id.
 	// All the branches in this statement will fork from it
-	branchingStateId := fm.ScopeAutomata.GetLastId()
+	branchingStateId := fm.Automaton.GetLastId()
 
 	// Generate an eps-transition to represent the creation of a new nested scope/branch
 	tEpsIfStart := fsa.Transition{Move: fsa.Eps, Label: "if-block-start"}
-	fm.ScopeAutomata.AddTransition(branchingStateId, fsa.NewState, tEpsIfStart)
+	fm.Automaton.AddTransition(branchingStateId, fsa.NewState, tEpsIfStart)
 	// Then parses both the condition and the nested scope (if-then)
 	ast.Walk(fm, stmt.Cond)
 	ast.Walk(fm, stmt.Body)
 	// Generates a transition to return/merge to the "main" scope
 	tEpsIfEnd := fsa.Transition{Move: fsa.Eps, Label: "if-block-end"}
-	fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tEpsIfEnd)
+	fm.Automaton.AddTransition(fsa.Current, fsa.NewState, tEpsIfEnd)
 
 	// Saves the id of the latest created state
 	// All the branches in this statement will converge to this
-	mergeStateId := fm.ScopeAutomata.GetLastId()
+	mergeStateId := fm.Automaton.GetLastId()
 
 	// If an else block is specified then its parsed on its own branch (2 equal branches are created)
 	if stmt.Else != nil {
 		tEpsElseStart := fsa.Transition{Move: fsa.Eps, Label: "else-block-start"}
-		fm.ScopeAutomata.AddTransition(branchingStateId, fsa.NewState, tEpsElseStart)
+		fm.Automaton.AddTransition(branchingStateId, fsa.NewState, tEpsElseStart)
 		// Parses the else block
 		ast.Walk(fm, stmt.Else)
 		// Links the else-block-end to the same destination as the if-block-end
 		tEpsElseEnd := fsa.Transition{Move: fsa.Eps, Label: "else-block-end"}
-		fm.ScopeAutomata.AddTransition(fsa.Current, mergeStateId, tEpsElseEnd)
+		fm.Automaton.AddTransition(fsa.Current, mergeStateId, tEpsElseEnd)
 	} else {
 		// If an else block isn't provided the we will have a "main" branch and the "alternative"
 		// execution flow (the one in which also the if-then block is executed as well)
 		tEpsIfSkip := fsa.Transition{Move: fsa.Eps, Label: "if-block-skip"}
-		fm.ScopeAutomata.AddTransition(branchingStateId, mergeStateId, tEpsIfSkip)
+		fm.Automaton.AddTransition(branchingStateId, mergeStateId, tEpsIfSkip)
 	}
 
 	// Set the new root of the Automaton, from which all future transition will start
-	fm.ScopeAutomata.SetRootId(mergeStateId)
+	fm.Automaton.SetRootId(mergeStateId)
 }
 
 // This function parses a SwitchStmt statement and saves the data extracted in a FuncMetadata struct.
@@ -73,7 +73,7 @@ func parseSwitchStmt(stmt *ast.SwitchStmt, fm *FuncMetadata) {
 
 	// Saves the id of the latest created state
 	// All the branches in this statement will converge to this
-	currentAutomataId := fm.ScopeAutomata.GetLastId()
+	currentAutomataId := fm.Automaton.GetLastId()
 	// All the branches in this statement will converge to this state
 	// The first branch to be parsed will be the one to initialize the variable with a valid id
 	mergeStateId := fsa.Unknown
@@ -87,7 +87,7 @@ func parseSwitchStmt(stmt *ast.SwitchStmt, fm *FuncMetadata) {
 		// and add it as a transition from the "branching point" saved before
 		startLabel := fmt.Sprintf("switch-case-%d-start", i)
 		tEpsStart := fsa.Transition{Move: fsa.Eps, Label: startLabel}
-		fm.ScopeAutomata.AddTransition(currentAutomataId, fsa.NewState, tEpsStart)
+		fm.Automaton.AddTransition(currentAutomataId, fsa.NewState, tEpsStart)
 
 		// Parses the ClauseCase statement, then parses the nested block/scopes
 		ast.Walk(fm, caseClauseStmt)
@@ -98,15 +98,15 @@ func parseSwitchStmt(stmt *ast.SwitchStmt, fm *FuncMetadata) {
 
 		if mergeStateId == fsa.Unknown {
 			// Saves the id, of the merge state for use in next iterations
-			fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tEpsEnd)
-			mergeStateId = fm.ScopeAutomata.GetLastId()
+			fm.Automaton.AddTransition(fsa.Current, fsa.NewState, tEpsEnd)
+			mergeStateId = fm.Automaton.GetLastId()
 		} else {
-			fm.ScopeAutomata.AddTransition(fsa.Current, mergeStateId, tEpsEnd)
+			fm.Automaton.AddTransition(fsa.Current, mergeStateId, tEpsEnd)
 		}
 	}
 
 	// Set the new root of the Automaton, from which all future transition will start
-	fm.ScopeAutomata.SetRootId(mergeStateId)
+	fm.Automaton.SetRootId(mergeStateId)
 }
 
 // This function parses a TypeSwitchStmt statement and saves the data extracted in a FuncMetadata struct.
@@ -119,7 +119,7 @@ func parseTypeSwitchStmt(stmt *ast.TypeSwitchStmt, fm *FuncMetadata) {
 
 	// Saves the id of the latest created state
 	// All the branches in this statement will converge to this
-	currentAutomataId := fm.ScopeAutomata.GetLastId()
+	currentAutomataId := fm.Automaton.GetLastId()
 	// All the branches in this statement will converge to this state
 	// The first branch to be parsed will be the one to initialize the variable with a valid id
 	mergeStateId := fsa.Unknown
@@ -133,7 +133,7 @@ func parseTypeSwitchStmt(stmt *ast.TypeSwitchStmt, fm *FuncMetadata) {
 		// and add it as a transition from the "branching point" saved before
 		startLabel := fmt.Sprintf("typeswitch-case-%d-start", i)
 		tEpsStart := fsa.Transition{Move: fsa.Eps, Label: startLabel}
-		fm.ScopeAutomata.AddTransition(currentAutomataId, fsa.NewState, tEpsStart)
+		fm.Automaton.AddTransition(currentAutomataId, fsa.NewState, tEpsStart)
 
 		// Parses the ClauseCase statement, then parses the nested block/scopes
 		ast.Walk(fm, caseClauseStmt)
@@ -144,13 +144,13 @@ func parseTypeSwitchStmt(stmt *ast.TypeSwitchStmt, fm *FuncMetadata) {
 
 		if mergeStateId == fsa.Unknown {
 			// Saves the id, of the merge state for use in next iterations
-			fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tEpsEnd)
-			mergeStateId = fm.ScopeAutomata.GetLastId()
+			fm.Automaton.AddTransition(fsa.Current, fsa.NewState, tEpsEnd)
+			mergeStateId = fm.Automaton.GetLastId()
 		} else {
-			fm.ScopeAutomata.AddTransition(fsa.Current, mergeStateId, tEpsEnd)
+			fm.Automaton.AddTransition(fsa.Current, mergeStateId, tEpsEnd)
 		}
 	}
 
 	// Set the new root of the Automaton, from which all future transition will start
-	fm.ScopeAutomata.SetRootId(mergeStateId)
+	fm.Automaton.SetRootId(mergeStateId)
 }

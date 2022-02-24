@@ -31,10 +31,10 @@ const (
 // extrapolate from the function declaration. Only the function declared in the file
 // by the user are evaluated (built-in and external functions are ignored)
 type FuncMetadata struct {
-	Name          string                  // The identifier of the function
-	ChanMeta      map[string]ChanMetadata // The channels available inside the function scope
-	InlineArgs    map[string]FuncArg      // The argument of the function to be inlined (Callbacks/Functions or Channels)
-	ScopeAutomata *fsa.FSA                // A graph representing the transition made inside the function body
+	Name       string                  // The identifier of the function
+	ChanMeta   map[string]ChanMetadata // The channels available inside the function scope
+	InlineArgs []FuncArg               // The argument of the function to be inlined (Callbacks/Functions or Channels)
+	Automaton  *fsa.FSA                // A graph representing the transition made inside the function body
 }
 
 type FuncArg struct {
@@ -141,10 +141,10 @@ func parseFuncDecl(stmt *ast.FuncDecl, fm FileMetadata) {
 
 	// Initial setup of the metadata record
 	metadata := FuncMetadata{
-		Name:          funcName,
-		ChanMeta:      make(map[string]ChanMetadata),
-		InlineArgs:    make(map[string]FuncArg),
-		ScopeAutomata: fsa.New(),
+		Name:       funcName,
+		ChanMeta:   make(map[string]ChanMetadata),
+		InlineArgs: make([]FuncArg, 0),
+		Automaton:  fsa.New(),
 	}
 
 	// Copies the global scope channel in the nested scope of the function.
@@ -171,11 +171,13 @@ func parseFuncDecl(stmt *ast.FuncDecl, fm FileMetadata) {
 			if isChannel {
 				// Adds the channel arg as "to be inlined"
 				newInlineArg := FuncArg{Offset: i, Name: argName, Type: Channel}
-				metadata.InlineArgs[argName] = newInlineArg
+				metadata.InlineArgs = append(metadata.InlineArgs, newInlineArg)
+				// In case of channel it adds as well to the ChanMeta fields
+				metadata.ChanMeta[argName] = ChanMetadata{Name: argName}
 			} else if isFunction {
 				// Adds the function arg as "to be inlined"
 				newInlineArg := FuncArg{Offset: i, Name: argName, Type: Function}
-				metadata.InlineArgs[argName] = newInlineArg
+				metadata.InlineArgs = append(metadata.InlineArgs, newInlineArg)
 			}
 		}
 	}
@@ -187,9 +189,9 @@ func parseFuncDecl(stmt *ast.FuncDecl, fm FileMetadata) {
 
 	// Adds an eps transition to a new state
 	t := fsa.Transition{Move: fsa.Eps, Label: fmt.Sprintf("func-%s-return", metadata.Name)}
-	metadata.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, t)
+	metadata.Automaton.AddTransition(fsa.Current, fsa.NewState, t)
 	// The newly created state will be the final state of the ScopeAutomata
-	metadata.ScopeAutomata.FinalStates.Add(metadata.ScopeAutomata.GetLastId())
+	metadata.Automaton.FinalStates.Add(metadata.Automaton.GetLastId())
 
 	// At last all the data extracted is returned
 	fm.FunctionMeta[funcName] = metadata
@@ -222,12 +224,12 @@ func parseGoStmt(stmt *ast.GoStmt, fm *FuncMetadata) {
 		}
 
 		// At last add the transition (with the payload) to the ScopeAutomata
-		fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tSpawn)
+		fm.Automaton.AddTransition(fsa.Current, fsa.NewState, tSpawn)
 	} else if isFuncAnonymous {
 		// ToDo: This functionality is not yet implemented
 		anonFuncName := fmt.Sprintf("%s-%s", anonymousFunc, fm.Name)
 		tSpawn := fsa.Transition{Move: fsa.Spawn, Label: anonFuncName}
-		fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tSpawn)
+		fm.Automaton.AddTransition(fsa.Current, fsa.NewState, tSpawn)
 		// ? Add parent ChanMeta (scope inheritance)
 		// ? Add parse arguments (different from above)
 		// ? Should parse body of funcLiteral
@@ -264,5 +266,5 @@ func parseCallExpr(expr *ast.CallExpr, fm *FuncMetadata) {
 	}
 
 	// At last add full the transition to the ScopeAutomata of the FuncMetadata
-	fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tCall)
+	fm.Automaton.AddTransition(fsa.Current, fsa.NewState, tCall)
 }

@@ -43,7 +43,7 @@ func parseSendStmt(stmt *ast.SendStmt, fm *FuncMetadata) {
 	if isIdent {
 		channelMeta := fm.ChanMeta[chanIdent.Name]
 		tSend := fsa.Transition{Move: fsa.Send, Label: chanIdent.Name, Payload: channelMeta}
-		fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tSend)
+		fm.Automaton.AddTransition(fsa.Current, fsa.NewState, tSend)
 	} else {
 		log.Fatalf("Could't find identifier in SendStmt at line: %d\n", stmt.Pos())
 	}
@@ -64,14 +64,14 @@ func parseRecvStmt(expr *ast.UnaryExpr, fm *FuncMetadata) {
 	// Retrieves the channel metadata and initializes a valid transition
 	channelMeta := fm.ChanMeta[chanIdent.Name]
 	tRecv := fsa.Transition{Move: fsa.Recv, Label: chanIdent.Name, Payload: channelMeta}
-	fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tRecv)
+	fm.Automaton.AddTransition(fsa.Current, fsa.NewState, tRecv)
 }
 
 // This function parses a SelectStmt statement and saves the Transition(s) data extracted
 // in the given FuncMetadata argument. In case of error during execution no error is returned.
 func parseSelectStmt(stmt *ast.SelectStmt, fm *FuncMetadata) {
 	// Saves a local copy of the current id, all the branch will fork from it
-	currentAutomataId := fm.ScopeAutomata.GetLastId()
+	currentAutomataId := fm.Automaton.GetLastId()
 	// The id of the state in which all the nested scopes will converge.
 	// It will be initialized correctly after the first iteration
 	mergeStateId := fsa.Unknown
@@ -85,7 +85,7 @@ func parseSelectStmt(stmt *ast.SelectStmt, fm *FuncMetadata) {
 		// and add it as a transition from the "branching point" saved before
 		startLabel := fmt.Sprintf("select-case-%d-start", i)
 		tEpsStart := fsa.Transition{Move: fsa.Eps, Label: startLabel}
-		fm.ScopeAutomata.AddTransition(currentAutomataId, fsa.NewState, tEpsStart)
+		fm.Automaton.AddTransition(currentAutomataId, fsa.NewState, tEpsStart)
 
 		// Parses the CaseClause, then parses the nested block/scopes
 		ast.Walk(fm, commClause)
@@ -96,15 +96,15 @@ func parseSelectStmt(stmt *ast.SelectStmt, fm *FuncMetadata) {
 
 		if mergeStateId == fsa.Unknown {
 			// Saves the id, of the merge state for use in next iterations
-			fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tEpsEnd)
-			mergeStateId = fm.ScopeAutomata.GetLastId()
+			fm.Automaton.AddTransition(fsa.Current, fsa.NewState, tEpsEnd)
+			mergeStateId = fm.Automaton.GetLastId()
 		} else {
-			fm.ScopeAutomata.AddTransition(fsa.Current, mergeStateId, tEpsEnd)
+			fm.Automaton.AddTransition(fsa.Current, mergeStateId, tEpsEnd)
 		}
 	}
 
 	// Set the new root of the Automaton, from which all future transition will start
-	fm.ScopeAutomata.SetRootId(mergeStateId)
+	fm.Automaton.SetRootId(mergeStateId)
 }
 
 // Specific function to extrapolate channel metadata from a DeclStmt statement.

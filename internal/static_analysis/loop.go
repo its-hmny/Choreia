@@ -25,12 +25,12 @@ func parseForStmt(stmt *ast.ForStmt, fm *FuncMetadata) {
 	ast.Walk(fm, stmt.Init)
 	ast.Walk(fm, stmt.Cond) // ? Parse BinaryExpr to find transition inside
 	// Saves a local copy of the current id, all the branch will fork from it
-	forkStateId := fm.ScopeAutomata.GetLastId()
+	forkStateId := fm.Automaton.GetLastId()
 
 	// Generate an eps-transition to represent the fork/branch (the iteration scope in the for loop)
 	// and add it as a transition from the "fork point" saved before
 	tEpsStart := fsa.Transition{Move: fsa.Eps, Label: "for-iteration-start"}
-	fm.ScopeAutomata.AddTransition(forkStateId, fsa.NewState, tEpsStart)
+	fm.Automaton.AddTransition(forkStateId, fsa.NewState, tEpsStart)
 
 	// Parses the nested block (and then) the post iteration statement
 	ast.Walk(fm, stmt.Body)
@@ -38,10 +38,10 @@ func parseForStmt(stmt *ast.ForStmt, fm *FuncMetadata) {
 
 	// Links back the iteration block to the fork state
 	tEpsEnd := fsa.Transition{Move: fsa.Eps, Label: "for-iteration-end"}
-	fm.ScopeAutomata.AddTransition(fsa.Current, forkStateId, tEpsEnd)
+	fm.Automaton.AddTransition(fsa.Current, forkStateId, tEpsEnd)
 	// Links the fork state to a new one (this represents the no-iteration or exit-iteration cases)
 	tEpsSkip := fsa.Transition{Move: fsa.Eps, Label: "for-iteration-skip"}
-	fm.ScopeAutomata.AddTransition(forkStateId, fsa.NewState, tEpsSkip)
+	fm.Automaton.AddTransition(forkStateId, fsa.NewState, tEpsSkip)
 }
 
 // This function parses a RangeStmt statement and saves the data extracted in a FuncMetadata struct.
@@ -62,15 +62,15 @@ func parseRangeStmt(stmt *ast.RangeStmt, fm *FuncMetadata) {
 				matchFound = true
 			}
 		}
-		for argName := range fm.InlineArgs {
-			if argName == iterateeIdent.Name {
+		for _, arg := range fm.InlineArgs {
+			if arg.Name == iterateeIdent.Name {
 				matchFound = true
 			}
 		}
 	}
 
 	// Saves a local copy of the current id, all the branch will fork from it
-	forkStateId := fm.ScopeAutomata.GetLastId()
+	forkStateId := fm.Automaton.GetLastId()
 
 	// Generate an eps-transition to represent the fork/branch (the iteration block in the loop)
 	// and add it as a transition, if we're using range on a channel then the transition became
@@ -78,10 +78,10 @@ func parseRangeStmt(stmt *ast.RangeStmt, fm *FuncMetadata) {
 	if matchFound {
 		channelMeta := fm.ChanMeta[iterateeIdent.Name]
 		tRecvStart := fsa.Transition{Move: fsa.Recv, Label: iterateeIdent.Name, Payload: channelMeta}
-		fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tRecvStart)
+		fm.Automaton.AddTransition(fsa.Current, fsa.NewState, tRecvStart)
 	} else {
 		tEpsStart := fsa.Transition{Move: fsa.Eps, Label: "range-iteration-start"}
-		fm.ScopeAutomata.AddTransition(fsa.Current, fsa.NewState, tEpsStart)
+		fm.Automaton.AddTransition(fsa.Current, fsa.NewState, tEpsStart)
 	}
 
 	// Parses the nested block
@@ -89,8 +89,8 @@ func parseRangeStmt(stmt *ast.RangeStmt, fm *FuncMetadata) {
 
 	// Links back the iteration block to the fork state
 	tEpsEnd := fsa.Transition{Move: fsa.Eps, Label: "range-iteration-end"}
-	fm.ScopeAutomata.AddTransition(fsa.Current, forkStateId, tEpsEnd)
+	fm.Automaton.AddTransition(fsa.Current, forkStateId, tEpsEnd)
 	// Links the fork state to a new one (this represents the no-iteration or exit-iteration cases)
 	tEpsSkip := fsa.Transition{Move: fsa.Eps, Label: "range-iteration-skip"}
-	fm.ScopeAutomata.AddTransition(forkStateId, fsa.NewState, tEpsSkip)
+	fm.Automaton.AddTransition(forkStateId, fsa.NewState, tEpsSkip)
 }
