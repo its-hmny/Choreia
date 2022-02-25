@@ -9,13 +9,14 @@
 package transforms
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/its-hmny/Choreia/internal/data_structures/fsa"
 	meta "github.com/its-hmny/Choreia/internal/static_analysis"
 )
 
-var nProjectionExtracted = 0
+var nGoroutineStarted = 0
 
 const nameTemplate = "%s (%d)"
 
@@ -27,11 +28,14 @@ const nameTemplate = "%s (%d)"
 // This means that this FSA will provide an "isolated" view of the choreography from the perspective
 // of the Goroutine that takes part in it (almost like a projection of the whole choreography)
 type GoroutineFSA struct {
-	Name      string   // An identifier for the Automata
-	Automaton *fsa.FSA // The FSA itself
+	Name string // An identifier for the Automata
+	meta.FuncMetadata
 }
 
-func ExtractGoroutineFSA(file meta.FileMetadata) map[string]*GoroutineFSA {
+// Given the metadata associated to a file it linearizes the automata found in it
+// (function calls inlining). Once done that extracts recursively the FSA associated to
+// each Goroutine spawned during the program execution, the latter are returned as output
+func ExtractGoroutineFSA(file meta.FileMetadata) map[string]GoroutineFSA {
 	inlinedCache := make(map[string]*fsa.FSA)
 
 	for _, function := range file.FunctionMeta {
@@ -42,16 +46,79 @@ func ExtractGoroutineFSA(file meta.FileMetadata) map[string]*GoroutineFSA {
 			continue
 		}
 
-		// Cache miss: We must linearize the current automaton
-		linearizeFSA(function, file, inlinedCache)
+		linearizeFSA(function, file, inlinedCache) // Cache miss: We must linearize the current automaton
 	}
 
-	// ToDO: Complete the second phase
+	name := fmt.Sprintf(nameTemplate, "main", nGoroutineStarted)
+	meta, existMeta := file.FunctionMeta["main"]
+	mainGrFSA := GoroutineFSA{name, meta}
+
+	automaton, existLin := inlinedCache["main"]
+	mainGrFSA.Automaton = automaton.Copy()
+
+	if !existMeta || !existLin {
+		log.Fatal("Automaton or meta associated to 'main' function not found")
+	}
+
 	// Extracts all the GoroutineFSA starting from the "main" function
 	// which is the entrypoint for the Go program
-	return make(map[string]*GoroutineFSA)
+	return extractSpawnTree(mainGrFSA, inlinedCache, file)
 }
 
+// Given an entrypoint (a Goroutine FSA) extracts recursively all the Goroutine spawned during
+// the execution of said Goroutine. Before the recursive call the formal args are replaced with
+// the actual ones. If A spawns B and B spawns C then extractSpawnTree(A) will return both B, C
+// since the latter is in B subtree but also in A subtree.
+func extractSpawnTree(gr GoroutineFSA, functions map[string]*fsa.FSA, file meta.FileMetadata) map[string]GoroutineFSA {
+	spawnedGoroutines := make(map[string]GoroutineFSA)
+
+	gr.Automaton.ForEachTransition(func(from, to int, t fsa.Transition) {
+		// We're only interested in the spawn of another Goroutine
+		if t.Move != fsa.Spawn {
+			return
+		}
+
+		nGoroutineStarted++
+		spawnedName := fmt.Sprintf(nameTemplate, t.Label, nGoroutineStarted)
+		// Retrieves a reference to the metadata of the spawned function
+		spawnedMeta, existMeta := file.FunctionMeta[t.Label]
+		spawnedGrFSA := GoroutineFSA{spawnedName, spawnedMeta}
+		// Retrieves a reference to the linearized automaton of the spawned function
+		spawnedLin, existLin := functions[t.Label]
+
+		// IF the automaton doesn't exist we override the transition with an eps one
+		if !existMeta || !existLin {
+			newT := fsa.Transition{Move: fsa.Eps, Label: "unknown-function-spawn"}
+			gr.Automaton.RemoveTransition(from, to, t)
+			gr.Automaton.RemoveTransition(from, to, newT)
+			return
+		}
+
+		// Get a reference to the list of actual arguments and formal ones
+		formalArgs := spawnedMeta.InlineArgs
+		actualArgs, _ := t.Payload.([]meta.FuncArg)
+		// Get a reference to the channels metadata in the caller scope
+		channelInfo := gr.ChanMeta
+
+		// Finds and replace transition with subject a formal parameter and replaces
+		// them with the same transition but with a reference to the actual argument
+		spawnedGrFSA.Automaton = argumentSubstitution(formalArgs, actualArgs, spawnedLin, channelInfo)
+
+		// Extracts recursively the spawn subtree of our spawned and updates the entries in our agglomerate
+		for grName, grFSA := range extractSpawnTree(spawnedGrFSA, functions, file) {
+			spawnedGoroutines[grName] = grFSA
+		}
+	})
+
+	// Adds the current GoroutineFSA to the list before returning
+	spawnedGoroutines[gr.Name] = gr
+	return spawnedGoroutines
+}
+
+// Given the metadata associated to a function linearize the automaton associated to the latter
+// by expanding recursively each function call present: The inlining is performed by copying the
+// automaton of the "called" function as subgraph to the automaton of the "caller".
+// Before inlining formal arguments are replaced by actual ones.
 func linearizeFSA(function meta.FuncMetadata, file meta.FileMetadata, cache map[string]*fsa.FSA) {
 	// Makes an independent copy that can be freely modified
 	copyAutomaton := function.Automaton.Copy()
@@ -101,6 +168,9 @@ func linearizeFSA(function meta.FuncMetadata, file meta.FileMetadata, cache map[
 	cache[function.Name] = copyAutomaton
 }
 
+// Implements the algorithm to replace formal arguments with actual ones.
+// Overrides the transition label but also the payload so that future reference to the channel
+// will always be correct and successfull
 func argumentSubstitution(formal, actual []meta.FuncArg, automaton *fsa.FSA, chanMeta map[string]meta.ChanMetadata) *fsa.FSA {
 	// Makes a copy that can be freely modified
 	automatonCopy := automaton.Copy()
@@ -170,130 +240,3 @@ func inlineAutomata(root *fsa.FSA, from, to int, t fsa.Transition, other *fsa.FS
 		root.AddTransition(finalStateId+offset, to, tExpansionEnd)
 	}
 }
-
-/*
-! This all need to be refactored
-// Extracts the Projection Automata (or "local view") for the given FuncMeta.
-// The ScopeAutomata of said function is used as entry point of the Projection CA.
-// Every call to another function is inlined in the local view.
-// When a new GoRoutine is spawned during the execution flow a new local view is generated.
-// Both Call and Spawn operation require expansion of formal arguments with actual ones
-func GetLocalViews(function meta.FuncMetadata, file meta.FileMetadata) map[string]*GoroutineFSA {
-	// Creates the Projection Automata for the current GoRoutine
-	current := GoroutineFSA{
-		Name:      fmt.Sprintf(nameTemplate, function.Name, nProjectionExtracted),
-		Automaton: function.ScopeAutomata.Copy(), // Makes a full independent copy of the funcMeta.ScopeAutomata
-	}
-
-	nProjectionExtracted++
-	extractedList := map[string]*GoroutineFSA{current.Name: &current}
-
-	// Iterates over each transition in the ScopeAutomata
-	function.ScopeAutomata.ForEachTransition(func(from, to int, t fsa.Transition) {
-		switch t.Move {
-		case fsa.Call:
-			inlineCallTransition(file, current.Automaton, from, to, t)
-		case fsa.Spawn:
-			for key, pAutomata := range extractSpawnTransition(file, current.Automaton, from, to, t) {
-				extractedList[key] = pAutomata
-			}
-		}
-	})
-
-	return extractedList
-}
-
-// Handles the Call transition in a local view (or Projection Automata), the call transition is removed
-// and the Scope Automata of the called function is inlined at her place (once the actual arguments are expanded)
-func inlineCallTransition(file meta.FileMetadata, root *fsa.FSA, from, to int, t fsa.Transition) {
-	// Tries to retrieve the called function metadata from the file
-	calledFunc, hasMeta := file.FunctionMeta[t.Label]
-
-	// Could not find metadata (probably built-in or external function such as "make" or "append")
-	// the call transition is replaced with an eps-transition
-	if !hasMeta {
-		newT := fsa.Transition{Move: fsa.Eps, Label: "unknown-function-call"}
-		root.RemoveTransition(from, to, t)
-		root.AddTransition(from, to, newT)
-		return
-	}
-
-	// Expands positional argument (Channel e Function/Callback) with the actual arguments provided
-	// by the caller (Find and Replace over the called ScopeAutomata) then inline the called ScopeAutomata
-	// into the root one
-	calledScopeAutomata := replaceActualArgs(t, calledFunc)
-	inlineAutomata(root, from, to, t, calledScopeAutomata)
-}
-
-// Hansles the Spawn transition in a local view (or Projection Automata), the local view of the newly spawned
-// is extracted with eventually the his "child" Goroutine and then the transition is updated with a reference
-// to the ProjectionAutomata struct of the spawned Goroutine
-func extractSpawnTransition(file meta.FileMetadata, root *fsa.FSA, from, to int, t fsa.Transition) map[string]*GoroutineFSA {
-	// Tries to retrieve the called function metadata from the file
-	calledFunc, hasMeta := file.FunctionMeta[t.Label]
-
-	// Could not find metadata (probably built-in or external function such as "make" or "append")
-	// the Choreography cannot be determined correctly with a missing actor so the program fails
-	if !hasMeta {
-		log.Fatalf("Couldn't find function %s spawned as Go Routine\n", t.Label)
-	}
-
-	// Expands positional arguments with the actual ones
-	calledFunc.ScopeAutomata = replaceActualArgs(t, calledFunc)
-	// Precalculates the key used for retrieval of the first local view extracted
-	calledFuncKey := fmt.Sprintf(nameTemplate, calledFunc.Name, nProjectionExtracted)
-
-	// Recursively call getProjectionAutomata on the spawned GoRoutine entrypoint
-	//(the function called with go keyword), then returns the extracted Projection Automata
-	// the first is always the spawned one, the others can be function spawned by the one spawned by us
-	newLocalAutomata := GetLocalViews(calledFunc, file)
-	// Retrieves a reference to the first local view
-	localViewRef := newLocalAutomata[calledFuncKey]
-
-	// Overrides the older transition with additional data (reference to the spawned ProjectionAutomata)
-	newT := fsa.Transition{Move: t.Move, Label: localViewRef.Name, Payload: localViewRef}
-	root.RemoveTransition(from, to, t)
-	root.AddTransition(from, to, newT)
-
-	return newLocalAutomata
-}
-
-// Expand positional argument (Channel e Function/Callback) with the actual ones so that any
-// Transition reference the actual channel at runtime. The function uses the offset of the arguments
-// and their types to determine which positional argument has to be replaced with the "actual" ones
-func replaceActualArgs(t fsa.Transition, calledFunc meta.FuncMetadata) *fsa.FSA {
-	// Copies the ScopeAutomata of the called function
-	calledAutomataCp := calledFunc.ScopeAutomata.Copy()
-	// Retrieves the actual arguments from the Call transition
-	expandArgs, _ := t.Payload.([]meta.FuncArg)
-
-	// Bails out at the first discrepancy returning a non-expanded copy
-	if len(expandArgs) != len(calledFunc.InlineArgs) {
-		log.Fatalf("Could not expand actual arguments: requested %d but given %d\n", len(calledFunc.InlineArgs), len(expandArgs))
-	}
-
-	// Expands the actual arguments with the positional ones
-	for _, actualArg := range expandArgs {
-		for _, funcArg := range calledFunc.InlineArgs {
-			// Tries to find a match beetwen the actual argument and the positional argument
-			if funcArg.Offset != actualArg.Offset || funcArg.Type != actualArg.Type {
-				continue
-			}
-
-			// If such match is found then all the transition in the localCopy that references that
-			// positional argument are replaced with transition to the actual argument
-			calledAutomataCp.ForEachTransition(func(from, to int, t fsa.Transition) {
-				if funcArg.Type == meta.Channel && t.Label == funcArg.Name && (t.Move == fsa.Recv || t.Move == fsa.Send) {
-					newT := fsa.Transition{Move: t.Move, Label: actualArg.Name}
-					// Replace the transitions in the copied ScopeAutomata
-					fmt.Println(from, to, newT)
-					calledAutomataCp.RemoveTransition(from, to, t)
-					calledAutomataCp.AddTransition(from, to, newT)
-				}
-				// ? Handle funcArg.Type == Function as well
-			})
-		}
-	}
-
-	return calledAutomataCp
-}*/
