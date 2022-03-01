@@ -197,6 +197,15 @@ func (fsa *FSA) Export(outputFile string, format graphviz.Format) {
 	gvInstance := graphviz.New()
 	graph, graphErr := gvInstance.Graph()
 
+	// Cleanup function that closes both the Graph and GraphViz instances
+	// in case of any error during execution or after the execution completed successfully
+	defer func() {
+		if err := graph.Close(); err != nil {
+			log.Fatal(err)
+		}
+		gvInstance.Close()
+	}()
+
 	if graphErr != nil {
 		log.Fatal(graphErr)
 	}
@@ -255,13 +264,4 @@ func (fsa *FSA) Export(outputFile string, format graphviz.Format) {
 	if exportErr != nil {
 		log.Fatal(exportErr)
 	}
-
-	// Cleanup function that closes both the Graph and GraphViz instances
-	// in case of any error during execution or after the execution completed successfully
-	defer func() {
-		if err := graph.Close(); err != nil {
-			log.Fatal(err)
-		}
-		gvInstance.Close()
-	}()
 }

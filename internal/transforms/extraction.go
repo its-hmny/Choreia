@@ -16,7 +16,10 @@ import (
 	meta "github.com/its-hmny/Choreia/internal/static_analysis"
 )
 
-var nGoroutineStarted = 0
+var (
+	nGoroutineStarted = 0
+	inlinedCache      = make(map[string]*fsa.FSA)
+)
 
 const nameTemplate = "%s (%d)"
 
@@ -36,7 +39,11 @@ type GoroutineFSA struct {
 // (function calls inlining). Once done that extracts recursively the FSA associated to
 // each Goroutine spawned during the program execution, the latter are returned as output
 func ExtractGoroutineFSA(file meta.FileMetadata) map[string]GoroutineFSA {
-	inlinedCache := make(map[string]*fsa.FSA)
+	// Cleanup function that resets the global variable nGoroutineStarted & inlinedCache
+	defer func() {
+		nGoroutineStarted = 0
+		inlinedCache = make(map[string]*fsa.FSA)
+	}()
 
 	for _, function := range file.FunctionMeta {
 		// Cache hit: The current automaton has already been linearized.
@@ -62,14 +69,14 @@ func ExtractGoroutineFSA(file meta.FileMetadata) map[string]GoroutineFSA {
 
 	// Extracts all the GoroutineFSA starting from the "main" function
 	// which is the entrypoint for the Go program
-	return extractSpawnTree(mainGrFSA, inlinedCache, file)
+	return extractSpawnTree(mainGrFSA, file)
 }
 
 // Given an entrypoint (a Goroutine FSA) extracts recursively all the Goroutine spawned during
 // the execution of said Goroutine. Before the recursive call the formal args are replaced with
 // the actual ones. If A spawns B and B spawns C then extractSpawnTree(A) will return both B, C
 // since the latter is in B subtree but also in A subtree.
-func extractSpawnTree(gr GoroutineFSA, functions map[string]*fsa.FSA, file meta.FileMetadata) map[string]GoroutineFSA {
+func extractSpawnTree(gr GoroutineFSA, file meta.FileMetadata) map[string]GoroutineFSA {
 	spawnedGoroutines := make(map[string]GoroutineFSA)
 
 	gr.Automaton.ForEachTransition(func(from, to int, t fsa.Transition) {
@@ -84,7 +91,7 @@ func extractSpawnTree(gr GoroutineFSA, functions map[string]*fsa.FSA, file meta.
 		spawnedMeta, existMeta := file.FunctionMeta[t.Label]
 		spawnedGrFSA := GoroutineFSA{spawnedName, spawnedMeta}
 		// Retrieves a reference to the linearized automaton of the spawned function
-		spawnedLin, existLin := functions[t.Label]
+		spawnedLin, existLin := inlinedCache[t.Label]
 
 		// IF the automaton doesn't exist we override the transition with an eps one
 		if !existMeta || !existLin {
@@ -105,7 +112,7 @@ func extractSpawnTree(gr GoroutineFSA, functions map[string]*fsa.FSA, file meta.
 		spawnedGrFSA.Automaton = argumentSubstitution(formalArgs, actualArgs, spawnedLin, channelInfo)
 
 		// Extracts recursively the spawn subtree of our spawned and updates the entries in our agglomerate
-		for grName, grFSA := range extractSpawnTree(spawnedGrFSA, functions, file) {
+		for grName, grFSA := range extractSpawnTree(spawnedGrFSA, file) {
 			spawnedGoroutines[grName] = grFSA
 		}
 	})
