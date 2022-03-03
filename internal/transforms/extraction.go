@@ -30,10 +30,7 @@ const nameTemplate = "%s (%d)"
 // this will be used in the future phases as a local view for the whole choreography.
 // This means that this FSA will provide an "isolated" view of the choreography from the perspective
 // of the Goroutine that takes part in it (almost like a projection of the whole choreography)
-type GoroutineFSA struct {
-	Name string // An identifier for the Automata
-	meta.FuncMetadata
-}
+type GoroutineFSA meta.FuncMetadata
 
 // Given the metadata associated to a file it linearizes the automata found in it
 // (function calls inlining). Once done that extracts recursively the FSA associated to
@@ -58,7 +55,9 @@ func ExtractGoroutineFSA(file meta.FileMetadata) map[string]GoroutineFSA {
 
 	name := fmt.Sprintf(nameTemplate, "main", nGoroutineStarted)
 	meta, existMeta := file.FunctionMeta["main"]
-	mainGrFSA := GoroutineFSA{name, meta}
+
+	mainGrFSA := GoroutineFSA(meta)
+	mainGrFSA.Name = name
 
 	automaton, existLin := inlinedCache["main"]
 	mainGrFSA.Automaton = automaton.Copy()
@@ -89,7 +88,10 @@ func extractSpawnTree(gr GoroutineFSA, file meta.FileMetadata) map[string]Gorout
 		spawnedName := fmt.Sprintf(nameTemplate, t.Label, nGoroutineStarted)
 		// Retrieves a reference to the metadata of the spawned function
 		spawnedMeta, existMeta := file.FunctionMeta[t.Label]
-		spawnedGrFSA := GoroutineFSA{spawnedName, spawnedMeta}
+
+		spawnedGrFSA := GoroutineFSA(spawnedMeta)
+		spawnedGrFSA.Name = spawnedName
+
 		// Retrieves a reference to the linearized automaton of the spawned function
 		spawnedLin, existLin := inlinedCache[t.Label]
 
