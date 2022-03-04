@@ -53,11 +53,9 @@ func ExtractGoroutineFSA(file meta.FileMetadata) map[string]GoroutineFSA {
 		linearizeFSA(function, file, inlinedCache) // Cache miss: We must linearize the current automaton
 	}
 
-	name := fmt.Sprintf(nameTemplate, "main", nGoroutineStarted)
 	meta, existMeta := file.FunctionMeta["main"]
-
 	mainGrFSA := GoroutineFSA(meta)
-	mainGrFSA.Name = name
+	mainGrFSA.Name = fmt.Sprintf(nameTemplate, "main", nGoroutineStarted)
 
 	automaton, existLin := inlinedCache["main"]
 	mainGrFSA.Automaton = automaton.Copy()
@@ -99,9 +97,14 @@ func extractSpawnTree(gr GoroutineFSA, file meta.FileMetadata) map[string]Gorout
 		if !existMeta || !existLin {
 			newT := fsa.Transition{Move: fsa.Eps, Label: "unknown-function-spawn"}
 			gr.Automaton.RemoveTransition(from, to, t)
-			gr.Automaton.RemoveTransition(from, to, newT)
+			gr.Automaton.AddTransition(from, to, newT)
 			return
 		}
+
+		// Updates the transition with a correct label
+		newT := fsa.Transition{Move: fsa.Spawn, Label: spawnedName}
+		gr.Automaton.RemoveTransition(from, to, t)
+		gr.Automaton.AddTransition(from, to, newT)
 
 		// Get a reference to the list of actual arguments and formal ones
 		formalArgs := spawnedMeta.InlineArgs

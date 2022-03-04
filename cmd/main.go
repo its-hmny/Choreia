@@ -66,6 +66,8 @@ func main() {
 
 	// Extracts the local views starting from the program entrypoint ("main" function)
 	localViews := transforms.ExtractGoroutineFSA(fileMetadata)
+	// A map with the deterministic version of the GoroutineFSA
+	detLocalViews := make(map[string]transforms.GoroutineFSA)
 
 	// For each local view of the Choreography Automata applies transformations (determinization, minimization)
 	for _, lView := range localViews {
@@ -83,6 +85,7 @@ func main() {
 
 		// Updates the automata for the local view
 		lView.Automaton = lViewDFA.Copy()
+		detLocalViews[lView.Name] = lView
 
 		// Additional export of .svg automata
 		if svgExportFlag != nil && *svgExportFlag {
@@ -95,7 +98,7 @@ func main() {
 	}
 
 	// At last extracts the Choreography Automata (also known as "global view")
-	finalCA := transforms.ComposeGoroutines(localViews)
+	finalCA := transforms.ComposeGoroutines(detLocalViews)
 	finalCA.Export(fmt.Sprintf("%s/Choreography Automata.dot", *outputPath), graphviz.XDOT)
 	// Additional export of .svg Choreography Automata
 	if svgExportFlag != nil && *svgExportFlag {
