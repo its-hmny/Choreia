@@ -9,34 +9,46 @@
 package transforms
 
 import (
+	"fmt"
 	"log"
 
 	list "github.com/emirpasic/gods/lists/singlylinkedlist"
 	"github.com/its-hmny/Choreia/internal/data_structures/fsa"
 )
 
-type tmp struct {
+type SimulationFSA struct {
 	GoroutineFSA
 	currentState int
 }
 
+var (
+	// ! simDiamond            = (*SimulationDiamond)(set.New())
+	simDiamond            = list.New()
+	choreographyAutomaton = fsa.New()
+)
+
 func ComposeGoroutines(goroutines map[string]GoroutineFSA) *fsa.FSA {
+	defer func() {
+		// simDiamond = (*SimulationDiamond)(set.New())
+		simDiamond = list.New()
+		choreographyAutomaton = fsa.New()
+	}()
+
 	mainGrFSA, exist := goroutines["main (0)"]
+	entrypoint := list.New(SimulationFSA{mainGrFSA, 0})
 
 	if !exist {
 		log.Fatal("Could not find GoroutineFSA for 'main'")
 	}
 
-	entrypoint := list.New(tmp{mainGrFSA, 0})
-	choreographyAutomaton := fsa.New()
-	explore(entrypoint, choreographyAutomaton)
+	explore(entrypoint, goroutines)
 	return choreographyAutomaton
 }
 
-func explore(sim *list.List, automaton *fsa.FSA) {
+func explore(sim *list.List, goroutines map[string]GoroutineFSA) {
 
 	for indexA, itemA := range sim.Values() {
-		participantA := itemA.(tmp)
+		participantA := itemA.(SimulationFSA)
 
 		// Unary transitions handling (Spawn)
 		participantA.Automaton.ForEachTransition(func(from, to int, t fsa.Transition) {
@@ -48,21 +60,54 @@ func explore(sim *list.List, automaton *fsa.FSA) {
 			// Makes a copy of the current participant adn updates its current state
 			copy := participantA
 			copy.currentState = to
-			// TODO Creates a new ... with the new participant state instead of the old one
-			newSim := list.New(sim.Values())
-			newSim.Remove(indexA)
-			newSim.Insert(indexA, participantA)
+			// Creates a new SimulationFSA with the new participant state instead of the old one
+			newSim := list.New(sim.Values()...)
 
-			// ? collega newSim a sim nell'FSA
-			// TODO Add edges and states in automaton
+			// TODO
+			pAIndex, _ := newSim.Find(func(index int, item interface{}) bool {
+				current := item.(SimulationFSA)
+				return participantA.Name == current.Name
+			})
+			// TODO
+			newSim.Remove(pAIndex)
+			newSim.Insert(pAIndex, copy)
 
-			// ? se newSim non esiste già allora aggiungilo alla map e recursive call
-			// TODO Recursive call on new ... explore(newSim, automaton)
+			grFSA, exist := goroutines[t.Label]
+			if !exist {
+				log.Fatalf("Could not find GoroutineFSA for %s", t.Label)
+			}
+			newSim.Add(SimulationFSA{grFSA, 0})
+
+			// If newSim isn't already contained in the simulation diamond then is added and a
+			// recursive call on this newly found system configuration is done to explore its subgraph
+			if !simDiamond.Contains(newSim) {
+				simDiamond.Add(newSim)
+				explore(newSim, goroutines)
+			}
+
+			// Retrieve the node id for the prev simulation state in the automaton
+			oldSimId, _ := simDiamond.Find(func(index int, item interface{}) bool {
+				current := item.(*list.List)
+				return current.Contains(sim.Values()...) && sim.Contains(current.Values()...)
+			})
+			// Retrieve the node id for the new simulation state in the automaton
+			newSimId, _ := simDiamond.Find(func(index int, item interface{}) bool {
+				current := item.(*list.List)
+				return current.Contains(sim.Values()...) && sim.Contains(current.Values()...)
+			})
+
+			// Adds a new edge in the choreography automaton
+			newT := fsa.Transition{
+				Move:  fsa.Empty,
+				Label: fmt.Sprintf("%s \u22C1 %s", participantA.Name, t.Label),
+			}
+			choreographyAutomaton.AddTransition(oldSimId, newSimId, newT)
+			fmt.Println(newT)
 		})
 
 		// Binary transitions handling (Send, Recv)
 		for indexB, itemB := range sim.Values() {
-			participantB := itemB.(tmp)
+			participantB := itemB.(SimulationFSA)
 
 			participantA.Automaton.ForEachTransition(func(fromA, toA int, tA fsa.Transition) {
 				participantB.Automaton.ForEachTransition(func(fromB, toB int, tB fsa.Transition) {
@@ -70,27 +115,69 @@ func explore(sim *list.List, automaton *fsa.FSA) {
 					copyA, copyB := participantA, participantB
 					copyA.currentState, copyB.currentState = toA, toB
 
-					// TODO Creates a new ... with the new participant state instead of the old one
-					newSim := list.New(sim.Values())
+					// Creates a new SimulationFSA with the new participant state instead of the old one
+					newSim := list.New(sim.Values()...)
 					newSim.Remove(indexA)
-					newSim.Remove(indexB)
 					newSim.Insert(indexA, copyA)
+					newSim.Remove(indexB)
 					newSim.Insert(indexB, copyB)
 
-					if tA.Move == fsa.Send && tB.Move == fsa.Recv && tA.Label == tB.Label {
-						// ? collega newSim a sim nell'FSA
-						// TODO Add edges and states in automaton
+					// // TODO
+					// pBIndex, _ := newSim.Find(func(index int, item interface{}) bool {
+					// 	current := item.(SimulationFSA)
+					// 	return participantB.Name == current.Name
+					// })
+					// // TODO
+					// newSim.Remove(pBIndex)
+					// newSim.Insert(pBIndex, copyA)
 
+					// Retrieve the node id for the prev simulation state in the automaton
+					oldSimId, _ := simDiamond.Find(func(index int, item interface{}) bool {
+						current := item.(*list.List)
+						return current.Contains(sim.Values()...) && sim.Contains(current.Values()...)
+					})
+					// Retrieve the node id for the new simulation state in the automaton
+					newSimId, _ := simDiamond.Find(func(index int, item interface{}) bool {
+						current := item.(*list.List)
+						return current.Contains(sim.Values()...) && sim.Contains(current.Values()...)
+					})
+
+					if tA.Move == fsa.Send && tB.Move == fsa.Recv && tA.Label == tB.Label {
+						// Adds a new edge in the choreography automaton
+						newT := fsa.Transition{
+							Move:  fsa.Empty,
+							Label: fmt.Sprintf("%s \u2192 %s", participantA.Name, participantB.Name),
+						}
+						fmt.Println(newT)
+						choreographyAutomaton.AddTransition(oldSimId, newSimId, newT)
+
+						// If newSim isn't already contained in the simulation diamond then is added and a
+						// recursive call on this newly found system configuration is done to explore
+						// its subgraph
+						if !simDiamond.Contains(newSim) {
+							simDiamond.Add(newSim)
+							explore(newSim, goroutines)
+						}
 					}
 
 					if tA.Move == fsa.Recv && tB.Move == fsa.Send && tA.Label == tB.Label {
-						// ? collega newSim a sim nell'FSA
-						// TODO Add edges and states in automaton
+						// Adds a new edge in the choreography automaton
+						newT := fsa.Transition{
+							Move:  fsa.Empty,
+							Label: fmt.Sprintf("%s \u2192 %s", participantB.Name, participantA.Name),
+						}
+						fmt.Println(newT)
+						choreographyAutomaton.AddTransition(oldSimId, newSimId, newT)
 
+						// If newSim isn't already contained in the simulation diamond then is added and a
+						// recursive call on this newly found system configuration is done to explore
+						// its subgraph
+						if !simDiamond.Contains(newSim) {
+							simDiamond.Add(newSim)
+							explore(newSim, goroutines)
+						}
 					}
 
-					// ? se newSim non esiste già allora aggiungilo alla map e recursive call
-					// TODO Recursive call on new ... explore(newSim, automaton)
 				})
 			})
 		}
