@@ -74,7 +74,6 @@ func createTransitions(syncFSA *fsa.FSA, couples *list.List, fromCouple *set.Set
 		couple := item.(*set.Set)
 		for _, frozenFSA := range fromCouple.Values() {
 			if couple.Contains(frozenFSA) {
-				fmt.Printf("(From %d => to %d) \t %s\n", currentId, destId, newT)
 				syncFSA.AddTransition(currentId, destId, newT)
 			}
 		}
@@ -86,7 +85,6 @@ func createTransitions(syncFSA *fsa.FSA, couples *list.List, fromCouple *set.Set
 // by composing all the Local View's FSAs into one and then appply a Synchronization transform on it
 func LocalViewsComposition(localViews map[string]*GoroutineFSA) *fsa.FSA {
 	cFSA := fsaProduct(localViews)
-	fmt.Printf("CompositionAutomata has %d states\n\n", ((*list.List)(cFSA)).Size())
 
 	// Creates the entrypoint couples (main - 0, wildcard), the starting couple of the program
 	mainKey := fmt.Sprintf(nameTemplate, "main", 0)

@@ -38,7 +38,7 @@ type GoroutineFSA struct {
 // Given the metadata associated to a file it linearizes the automata found in it
 // (function calls inlining). Once done that extracts recursively the FSA associated to
 // each Goroutine spawned during the program execution, the latter are returned as output
-func ExtractGoroutineFSA(file meta.FileMetadata) map[string]GoroutineFSA {
+func ExtractGoroutineFSA(file meta.FileMetadata) map[string]*GoroutineFSA {
 	// Cleanup function that resets the global variable nGoroutineStarted & inlinedCache
 	defer func() {
 		nGoroutineStarted = 0
@@ -76,8 +76,8 @@ func ExtractGoroutineFSA(file meta.FileMetadata) map[string]GoroutineFSA {
 // the execution of said Goroutine. Before the recursive call the formal args are replaced with
 // the actual ones. If A spawns B and B spawns C then extractSpawnTree(A) will return both B, C
 // since the latter is in B subtree but also in A subtree.
-func extractSpawnTree(gr GoroutineFSA, file meta.FileMetadata) map[string]GoroutineFSA {
-	spawnedGoroutines := make(map[string]GoroutineFSA)
+func extractSpawnTree(gr GoroutineFSA, file meta.FileMetadata) map[string]*GoroutineFSA {
+	spawnedGoroutines := make(map[string]*GoroutineFSA)
 
 	gr.Automaton.ForEachTransition(func(from, to int, t fsa.Transition) {
 		// We're only interested in the spawn of another Goroutine
@@ -97,9 +97,14 @@ func extractSpawnTree(gr GoroutineFSA, file meta.FileMetadata) map[string]Gorout
 		if !existMeta || !existLin {
 			newT := fsa.Transition{Move: fsa.Eps, Label: "unknown-function-spawn"}
 			gr.Automaton.RemoveTransition(from, to, t)
-			gr.Automaton.RemoveTransition(from, to, newT)
+			gr.Automaton.AddTransition(from, to, newT)
 			return
 		}
+
+		// Updates the Spawn transition with the full name/id of the spawned Goroutine
+		newT := fsa.Transition{Move: fsa.Spawn, Label: spawnedName}
+		gr.Automaton.RemoveTransition(from, to, t)
+		gr.Automaton.AddTransition(from, to, newT)
 
 		// Get a reference to the list of actual arguments and formal ones
 		formalArgs := spawnedMeta.InlineArgs
@@ -118,7 +123,7 @@ func extractSpawnTree(gr GoroutineFSA, file meta.FileMetadata) map[string]Gorout
 	})
 
 	// Adds the current GoroutineFSA to the list before returning
-	spawnedGoroutines[gr.Name] = gr
+	spawnedGoroutines[gr.Name] = &gr
 	return spawnedGoroutines
 }
 

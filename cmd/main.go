@@ -95,10 +95,10 @@ func main() {
 	}
 
 	// At last extracts the Choreography Automata (also known as "global view")
-	// ! finalCA := transforms.LocalViewsComposition(localViews)
-	// ! finalCA.Export(fmt.Sprintf("%s/Choreography Automata.dot", *outputPath), graphviz.XDOT)
+	finalCA := transforms.LocalViewsComposition(localViews)
+	finalCA.Export(fmt.Sprintf("%s/Choreography Automata.dot", *outputPath), graphviz.XDOT)
 	// Additional export of .svg Choreography Automata
-	// ! if svgExportFlag != nil && *svgExportFlag {
-	// ! 	finalCA.Export(fmt.Sprintf("%s/Choreography Automata.svg", *outputPath), graphviz.SVG)
-	// ! }
+	if svgExportFlag != nil && *svgExportFlag {
+		finalCA.Export(fmt.Sprintf("%s/Choreography Automata.svg", *outputPath), graphviz.SVG)
+	}
 }
