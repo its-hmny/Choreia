@@ -16,6 +16,7 @@ import (
 	set "github.com/emirpasic/gods/sets/hashset"
 
 	"github.com/its-hmny/Choreia/internal/data_structures/fsa"
+	meta "github.com/its-hmny/Choreia/internal/static_analysis"
 )
 
 type ProductFSA *list.List // A list of (FrozenAutomata, FrozenAutomata) tuples
@@ -197,7 +198,7 @@ func fsaSynchronization(cFSA ProductFSA, synchedCouples *list.List) *fsa.FSA {
 			// Find the id of the current couple in the precalc list
 			id := findCoupleId(synchedCouples, set.New(newFrozenA, wildcard))
 			// Generate the new transition with label
-			interactionLabel := fmt.Sprintf("%s %q %s", frozenA.localView.Name, '\u22C1', tA.Label)
+			interactionLabel := fmt.Sprintf("%s △ %s", frozenA.localView.Name, tA.Label)
 			newT := fsa.Transition{Move: fsa.Empty, Label: interactionLabel}
 			// Add said transition to the final synchronization FSA
 			createTransitions(synchAutomata, synchedCouples, set.New(frozenA), id, newT)
@@ -207,7 +208,7 @@ func fsaSynchronization(cFSA ProductFSA, synchedCouples *list.List) *fsa.FSA {
 			// Find the id of the current couple in the precalc list
 			id := findCoupleId(synchedCouples, set.New(newFrozenB, wildcard))
 			// Generate the new transition with label
-			interactionLabel := fmt.Sprintf("%s %q %s", frozenB.localView.Name, '\u22C1', tB.Label)
+			interactionLabel := fmt.Sprintf("%s △ %s", frozenB.localView.Name, tB.Label)
 			newT := fsa.Transition{Move: fsa.Empty, Label: interactionLabel}
 			// Add said transition to the final synchronization FSA
 			createTransitions(synchAutomata, synchedCouples, set.New(frozenB), id, newT)
@@ -217,7 +218,8 @@ func fsaSynchronization(cFSA ProductFSA, synchedCouples *list.List) *fsa.FSA {
 			// Find the id of the current couple in the precalc list
 			id := findCoupleId(synchedCouples, set.New(newFrozenA, newFrozenB))
 			// Generate the new transition with label
-			interactionLabel := fmt.Sprintf("%s %q %s", frozenB.localView.Name, '\u2190', frozenA.localView.Name)
+			msgType := tA.Payload.(meta.ChanMetadata).Type
+			interactionLabel := fmt.Sprintf("%s → %s: %s", frozenB.localView.Name, frozenA.localView.Name, msgType)
 			newT := fsa.Transition{Move: fsa.Empty, Label: interactionLabel}
 			// Add said transition to the final synchronization FSA
 			createTransitions(synchAutomata, synchedCouples, set.New(frozenA, frozenB), id, newT)
@@ -225,7 +227,8 @@ func fsaSynchronization(cFSA ProductFSA, synchedCouples *list.List) *fsa.FSA {
 			// Find the id of the current couple in the precalc list
 			id := findCoupleId(synchedCouples, set.New(newFrozenA, newFrozenB))
 			// Generate the new transition with label
-			interactionLabel := fmt.Sprintf("%s %q %s", frozenA.localView.Name, '\u2190', frozenB.localView.Name)
+			msgType := tA.Payload.(meta.ChanMetadata).Type
+			interactionLabel := fmt.Sprintf("%s → %s: %s", frozenA.localView.Name, frozenB.localView.Name, msgType)
 			newT := fsa.Transition{Move: fsa.Empty, Label: interactionLabel}
 			// Add said transition to the final synchronization FSA
 			createTransitions(synchAutomata, synchedCouples, set.New(frozenA, frozenB), id, newT)

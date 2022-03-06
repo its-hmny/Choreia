@@ -40,18 +40,18 @@ type Transition struct {
 func (t Transition) String() string {
 	switch t.Move {
 	case Eps:
-		return fmt.Sprintf("%q %s", '\u03B5', t.Label)
+		return fmt.Sprintf("ϵ %s", t.Label)
 	case Recv:
-		return fmt.Sprintf("%q %s", '\u2190', t.Label)
+		return fmt.Sprintf("← %s", t.Label)
 	case Send:
-		return fmt.Sprintf("%q %s", '\u2192', t.Label)
+		return fmt.Sprintf("→ %s", t.Label)
 	case Call:
-		return fmt.Sprintf("%q %s", '\u2A0F', t.Label)
+		return fmt.Sprintf("⨏ %s", t.Label)
 	case Spawn:
-		return fmt.Sprintf("%q %s", '\u22C1', t.Label)
+		return fmt.Sprintf("△ %s", t.Label)
 	case Empty:
 		return t.Label
 	default:
-		return fmt.Sprintf("%q %s", '\u2048', t.Label)
+		return fmt.Sprintf("⁈ %s", t.Label)
 	}
 }
