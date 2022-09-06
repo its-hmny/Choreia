@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/its-hmny/Choreia/metadata"
 	"github.com/teris-io/cli"
 )
 
@@ -29,26 +30,34 @@ var MetadataCmd = cli.
 // Parses and validates arguments coming from the CLI, eventually transforming them or
 // replacing them with default values before calling the wrapped library function.
 func MetadataHandler(args []string, options map[string]string) int {
+	// Destructures the fields from the respective origins
+	input, output, verbose := args[0], options["output"], options["verbose"] == "true"
+
 	if len(args) == 0 {
 		log.Fatal("You must provide a .go input file to be analyzed")
 		return 1
 	}
-	if _, err := os.Stat(args[0]); err != nil {
+	if _, err := os.Stat(input); err != nil {
 		log.Fatal("The path provided doesn't exist, please check it")
 		return 1
 	}
-	if filestat, _ := os.Stat(args[0]); filestat.IsDir() {
+	if filestat, _ := os.Stat(input); filestat.IsDir() {
 		log.Fatal("Argument must be a file path, directory are not supported yet")
 		return 1
 	}
 
 	// If no output path is not provided then the file is saved in the same
 	// directory as the input with just a different extension (in this case .json)
-	if options["output"] == "" {
-		options["output"] = strings.Replace(args[0], ".go", ".json", -1)
+	if output == "" {
+		output = strings.Replace(input, ".go", ".json", -1)
 	}
 
-	return 0 // return metadata.ExtractAndSave()
+	if _, err := metadata.ExtractAndSave(input, output, verbose); err != nil {
+		log.Fatal("Argument must be a file path, directory are not supported yet")
+		return 1
+	}
+
+	return 0
 }
 
 func main() {
