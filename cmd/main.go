@@ -5,13 +5,15 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"os"
+	"strings"
 
 	"github.com/teris-io/cli"
 )
 
 // Usage message to print when the user uses the --help flag
+// TODO Further elaborate and document
 const Usage = `Associates a Choreography Automata to your Go program.`
 
 // "metadata" subcommand, extracts the metadata from the given program through static analysis
@@ -22,7 +24,32 @@ var MetadataCmd = cli.
 	WithOption(cli.NewOption("output", "Output file path").WithChar('o').WithType(cli.TypeString)).
 	WithOption(cli.NewOption("verbose", "Verbose logging").WithChar('v').WithType(cli.TypeBool)).
 	// Registers an handler function that will dispatche the argument to the respective module
-	WithAction(func(args []string, options map[string]string) int { fmt.Println(args, options); return 0 })
+	WithAction(MetadataHandler)
+
+// Parses and validates arguments coming from the CLI, eventually transforming them or
+// replacing them with default values before calling the wrapped library function.
+func MetadataHandler(args []string, options map[string]string) int {
+	if len(args) == 0 {
+		log.Fatal("You must provide a .go input file to be analyzed")
+		return 1
+	}
+	if _, err := os.Stat(args[0]); err != nil {
+		log.Fatal("The path provided doesn't exist, please check it")
+		return 1
+	}
+	if filestat, _ := os.Stat(args[0]); filestat.IsDir() {
+		log.Fatal("Argument must be a file path, directory are not supported yet")
+		return 1
+	}
+
+	// If no output path is not provided then the file is saved in the same
+	// directory as the input with just a different extension (in this case .json)
+	if options["output"] == "" {
+		options["output"] = strings.Replace(args[0], ".go", ".json", -1)
+	}
+
+	return 0 // return metadata.ExtractAndSave()
+}
 
 func main() {
 	// Builds the CLI app with the respective subcommands
