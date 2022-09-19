@@ -5,30 +5,24 @@
 // Package metadata declares the types used to store metadata about Go's AST nodes.
 package metadata
 
+import (
+	"os"
+
+	log "github.com/sirupsen/logrus"
+)
+
+// List of meaningful argument types that requires further computations
+// when passed as arguments to another function
+type ArgType int
+
 const (
-	// List of allowed meaningful argument types that requires special elaborations
-	ArgTypeChannel = iota
-	ArgTypeFunction
-	ArgTypeWaitGroup
+	Chan ArgType = iota
+	WaitGroup
+	Func
 )
 
 // ----------------------------------------------------------------------------
-// PackageMetadata
-
-// Represents and stores the informations extracted about any given package
-// used inside the provided Go program/project. Since we focus on concurrency
-// and message passing we're mainly interested extracting informations about
-// channels, function (that uses channels) and, eventually, the 'init' function
-// of the package (for any side effects during module mounting).
-type PackageMetadata struct {
-	Name      string             `json:"pkg_name"`      // Package name or identifier
-	Channels  []ChannelMetadata  `json:"pkg_channels"`  // Channels declared inside the module
-	Functions []FunctionMetadata `json:"pkg_functions"` // Function declared inside the module
-	InitFlow  interface{}        `json:"pkg_init_flow"` // TODO: Add FSA package
-}
-
-// ----------------------------------------------------------------------------
-// FunctionMetadata
+// Function
 
 // Represents and stores the informations extracted about any given function
 // declared inside a given module. Mainly we're interested in saving the Name
@@ -40,27 +34,27 @@ type PackageMetadata struct {
 // concurrent execution, some example may be channels, callbacks and waitgroups
 // passed by the caller that may have some side effects on the concurrent
 // system and overall 'Choreography'.
-type FunctionMetadata struct {
-	Name        string             `json:"func_name"`         // Function name or identifier
-	Arguments   []ArgumentMetadata `json:"func_arguments"`    // "Meaningful" arguments passed by the caller
-	Channels    []ChannelMetadata  `json:"func_channels"`     // Channels declared inside the function scope
-	ControlFlow interface{}        `json:"func_control_flow"` // TODO: Add FSA package
+type Function struct {
+	Name        string              `json:"func_name"`         // Function name or identifier
+	Arguments   map[string]Argument `json:"func_arguments"`    // "Meaningful" arguments passed by the caller
+	Channels    map[string]Channel  `json:"func_channels"`     // Channels declared inside the function scope
+	ControlFlow interface{}         `json:"func_control_flow"` // TODO: Add FSA package
 }
 
 // ----------------------------------------------------------------------------
-// ChannelMetadata
+// Channel
 
 // Represents and stores informations extracted about any given channel
 // declared throughout the program/source code. We're only interested in
 // the Name (also Identifier) of the channel and the type of the message
 // exchanged through it for visualization pourposes.
-type ChannelMetadata struct {
+type Channel struct {
 	Name    string `json:"chan_name"`     // Channel name or identifier
 	MsgType string `json:"chan_msg_type"` // Type of message exchanged on channel
 }
 
 // ----------------------------------------------------------------------------
-// ArgumentMetadata
+// Argument
 
 // Represents and stores the informations extracted about any meaningful
 // argument declared in the function signature. By meaningful argument we mean
@@ -68,8 +62,18 @@ type ChannelMetadata struct {
 // program. By passing one channel instead of another the function may communicate
 // with a whole different set of Goroutines, the same applies for functions and
 // callbacks and "possibly" WaitGroups.
-type ArgumentMetadata struct {
-	Name     string `json:"arg_name"`     // Argument name or identifier
-	Position int    `json:"arg_position"` // Argument position (first, second, ...)
-	ArgType  int    `json:"arg_type"`     // Type of the argument (Channel, Function, WaitGroup, ...)
+type Argument struct {
+	Name     string  `json:"arg_name"`     // Argument name or identifier
+	Position int     `json:"arg_position"` // Argument position in the function signature (first, second, ...)
+	Type     ArgType `json:"arg_type"`     // Type of the argument (Channel, Function, WaitGroup, ...)
+}
+
+// Module initialization function, setups the logger module-wide
+func init() {
+	// Log as ASCII instead of the default JSON formatter.
+	log.SetFormatter(&log.TextFormatter{ForceColors: true, FullTimestamp: true, TimestampFormat: "15:04:05"})
+	// Output to stdout instead of the default stderr
+	log.SetOutput(os.Stdout)
+	// Only log the warning severity or above.
+	log.SetLevel(log.TraceLevel)
 }
