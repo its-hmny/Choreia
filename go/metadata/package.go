@@ -19,7 +19,7 @@ import (
 // channels, function (that uses channels) and, eventually, the 'init' function
 // of the package (for any side effects during module mounting).
 type Package struct {
-	ast.Visitor                     // Implements the ast.Visitor interface (has the Visit(*ast.Node) function)
+	ast.Visitor `json:"-"`          // Implements the ast.Visitor interface (has the Visit(*ast.Node) function)
 	Name        string              `json:"pkg_name"`      // Package name or identifier
 	Channels    map[string]Channel  `json:"pkg_channels"`  // Channels declared inside the module
 	Functions   map[string]Function `json:"pkg_functions"` // Function declared inside the module
@@ -42,7 +42,7 @@ func (pkg Package) Visit(node ast.Node) ast.Visitor {
 		return pkg
 	default:
 		log.Fatalf("Unexpected statement '%T' at pos: %d", statement, node.Pos())
-		return pkg
+		return nil
 	}
 }
 
@@ -74,8 +74,9 @@ func (pkg Package) FromFuncDecl(function *ast.FuncDecl) {
 
 	// Extracts metadata recursively on the function scope and control flow
 	for _, statement := range function.Body.List {
-		statement.End()
-		// meta.Visit(statement)
+		meta.Visit(statement)
 	}
 
+	// Registers the complete function meta in the parent scope
+	pkg.Functions[meta.Name] = meta
 }

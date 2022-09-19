@@ -11,8 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// List of meaningful argument types that requires further computations
-// when passed as arguments to another function
+// Argument types that requires further computations when passed to another function
 type ArgType int
 
 const (
@@ -20,26 +19,6 @@ const (
 	WaitGroup
 	Func
 )
-
-// ----------------------------------------------------------------------------
-// Function
-
-// Represents and stores the informations extracted about any given function
-// declared inside a given module. Mainly we're interested in saving the Name
-// of the function and the Channels declared inside its scope. Also quite useful
-// is an approximation of the ControlFlow of the function made with a Finite
-// State Automata (FSA) which, in our case keeps track of Goroutine spawning
-// and send/receive operations on both global and local-scoped channels.
-// Also we keep track of Arguments which are meaningful to the function
-// concurrent execution, some example may be channels, callbacks and waitgroups
-// passed by the caller that may have some side effects on the concurrent
-// system and overall 'Choreography'.
-type Function struct {
-	Name        string              `json:"func_name"`         // Function name or identifier
-	Arguments   map[string]Argument `json:"func_arguments"`    // "Meaningful" arguments passed by the caller
-	Channels    map[string]Channel  `json:"func_channels"`     // Channels declared inside the function scope
-	ControlFlow interface{}         `json:"func_control_flow"` // TODO: Add FSA package
-}
 
 // ----------------------------------------------------------------------------
 // Channel
