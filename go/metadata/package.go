@@ -27,8 +27,7 @@ type Package struct {
 }
 
 func (pkg Package) Visit(node ast.Node) ast.Visitor {
-	// Skips leaf nodes in the AST
-	if node == nil {
+	if node == nil { // Skips leaf/empty nodes in the AST
 		return nil
 	}
 
@@ -46,17 +45,17 @@ func (pkg Package) Visit(node ast.Node) ast.Visitor {
 	}
 }
 
-func (pkg Package) FromGenDecl(declaration *ast.GenDecl) {
+func (pkg *Package) FromGenDecl(declaration *ast.GenDecl) {
 	for _, child := range declaration.Specs {
 		switch specific := child.(type) {
 		case *ast.ImportSpec:
 			// TODO: Add module name <-> alias registration
-			log.Warn("Found ast.ImportSpec in ast.GenDecl but ignored")
+			log.Warn("Found ast.ImportSpec in ast.GenDecl")
 		case *ast.ValueSpec:
-			log.Warn("Found ast.ValueSpec in ast.GenDecl but ignored")
+			log.Warn("Found ast.ValueSpec in ast.GenDecl")
 		case *ast.TypeSpec:
 			// TODO: Consider type definition only if it involves metadata.ArgType(s)
-			log.Warn("Found ast.Typespec in ast.GenDecl but ignored")
+			log.Warn("Found ast.Typespec in ast.GenDecl")
 		default:
 			log.Fatalf("ast.GenDecl contains %T but it's not expected", specific)
 		}
@@ -64,7 +63,7 @@ func (pkg Package) FromGenDecl(declaration *ast.GenDecl) {
 
 }
 
-func (pkg Package) FromFuncDecl(function *ast.FuncDecl) {
+func (pkg *Package) FromFuncDecl(function *ast.FuncDecl) {
 	// Creates a new FunctionMetadata instance to save the info
 	meta := Function{Name: function.Name.Name, Arguments: map[string]Argument{}, Channels: map[string]Channel{}, ControlFlow: nil}
 	log.Tracef("Found function '%s' in package '%s'", meta.Name, pkg.Name)

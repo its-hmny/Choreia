@@ -32,8 +32,7 @@ type Function struct {
 }
 
 func (fun Function) Visit(node ast.Node) ast.Visitor {
-	// Skips leaf nodes in the AST
-	if node == nil {
+	if node == nil { // Skips leaf/empty nodes in the AST
 		return nil
 	}
 
