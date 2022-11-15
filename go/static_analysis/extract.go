@@ -37,7 +37,7 @@ func ExtractFromPackage(pkg *ast.Package) (metadata.Package, error) {
 	// TODO: Add imports expansion and recursive parsing
 
 	for _, file := range pkg.Files {
-		log.Infof("Found new file in package '%s'", pkg.Name)
+		log.Trace("Found new file in package '%s'", pkg.Name)
 		for _, fileDecl := range file.Decls {
 			meta.Visit(fileDecl)
 		}
@@ -59,7 +59,7 @@ func Extract(path string) (map[string]metadata.Package, error) {
 
 	extracted := make(map[string]metadata.Package)
 	for _, pkg := range parsed {
-		log.Infof("Found package: '%s'", pkg.Name)
+		log.Trace("Found package: '%s'", pkg.Name)
 
 		pkgMeta, err := ExtractFromPackage(pkg)
 		extracted[pkgMeta.Name] = pkgMeta

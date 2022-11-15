@@ -52,8 +52,7 @@ func (fun *Function) Visit(node ast.Node) ast.Visitor {
 		fun.FromSendStmt(statement)
 		return fun
 	default:
-		log.Fatalf("Unexpected statement '%T' at pos: %d", statement, node.Pos())
-		statement.End()
+		log.Infof("Unexpected statement '%T' at pos: %d", statement, node.Pos())
 		return nil
 	}
 }
