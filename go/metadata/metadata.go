@@ -12,12 +12,12 @@ import (
 )
 
 // Argument types that requires further computations when passed to another function
-type ArgType int
+type ArgtType int
 
 const (
-	Chan ArgType = iota
-	WaitGroup
-	Func
+	ArgChannel ArgtType = iota
+	ArgWaitGroup
+	ArgFunction
 )
 
 // ----------------------------------------------------------------------------
@@ -42,9 +42,9 @@ type Channel struct {
 // with a whole different set of Goroutines, the same applies for functions and
 // callbacks and "possibly" WaitGroups.
 type Argument struct {
-	Name     string  `json:"arg_name"`     // Argument name or identifier
-	Position int     `json:"arg_position"` // Argument position in the function signature (first, second, ...)
-	Type     ArgType `json:"arg_type"`     // Type of the argument (Channel, Function, WaitGroup, ...)
+	Name     string   `json:"arg_name"`     // Argument name or identifier
+	Position int      `json:"arg_position"` // Argument position in the function signature (first, second, ...)
+	Type     ArgtType `json:"arg_type"`     // Type of the argument (Channel, Function, WaitGroup, ...)
 }
 
 // Module initialization function, setups the logger module-wide
