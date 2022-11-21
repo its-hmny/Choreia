@@ -26,10 +26,10 @@ import (
 // system and overall 'Choreography'.
 type Function struct {
 	ast.Visitor `json:"-"`          // Implements the ast.Visitor interface (has the Visit(*ast.Node) function)
-	Name        string              `json:"func_name"`         // Function name or identifier
-	Arguments   map[string]Argument `json:"func_arguments"`    // "Meaningful" arguments passed by the caller
-	Channels    map[string]Channel  `json:"func_channels"`     // Channels declared inside the function scope
-	ControlFlow interface{}         `json:"func_control_flow"` // TODO: Add FSA package
+	Name        string              `json:"name"`         // Function name or identifier
+	Arguments   map[string]Argument `json:"arguments"`    // "Meaningful" arguments passed by the caller
+	Channels    map[string]Channel  `json:"channels"`     // Channels declared inside the function scope
+	ControlFlow interface{}         `json:"control_flow"` // TODO: Add FSA package
 }
 
 // Extracts recursively Channel and ControlFlow metadata from the function body.

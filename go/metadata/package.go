@@ -20,10 +20,10 @@ import (
 // of the package (for any side effects during module mounting).
 type Package struct {
 	ast.Visitor `json:"-"`          // Implements the ast.Visitor interface (has the Visit(*ast.Node) function)
-	Name        string              `json:"pkg_name"`      // Package name or identifier
-	Channels    map[string]Channel  `json:"pkg_channels"`  // Channels declared inside the module
-	Functions   map[string]Function `json:"pkg_functions"` // Function declared inside the module
-	InitFlow    interface{}         `json:"pkg_init_flow"` // TODO: Add FSA package
+	Name        string              `json:"name"`      // Package name or identifier
+	Channels    map[string]Channel  `json:"channels"`  // Channels declared inside the module
+	Functions   map[string]Function `json:"functions"` // Function declared inside the module
+	InitFlow    interface{}         `json:"init_flow"` // TODO: Add FSA package
 }
 
 func (pkg Package) Visit(node ast.Node) ast.Visitor {

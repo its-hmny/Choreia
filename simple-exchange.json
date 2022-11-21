@@ -1,26 +1,26 @@
 {
   "main": {
-    "pkg_name": "main",
-    "pkg_channels": {},
-    "pkg_functions": {
+    "name": "main",
+    "channels": {},
+    "functions": {
       "main": {
-        "func_name": "main",
-        "func_arguments": {},
-        "func_channels": {
+        "name": "main",
+        "arguments": {},
+        "channels": {
           "channel": {
-            "chan_name": "channel",
-            "chan_msg_type": "string"
+            "name": "channel",
+            "msg_type": "string"
           }
         },
-        "func_control_flow": null
+        "control_flow": null
       },
       "sayHello": {
-        "func_name": "sayHello",
-        "func_arguments": {},
-        "func_channels": {},
-        "func_control_flow": null
+        "name": "sayHello",
+        "arguments": {},
+        "channels": {},
+        "control_flow": null
       }
     },
-    "pkg_init_flow": null
+    "init_flow": null
   }
 }
