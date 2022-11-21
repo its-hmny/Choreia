@@ -10,22 +10,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// ----------------------------------------------------------------------------
-// Package
-
-// Represents and stores the information extracted about any given package
-// used inside the provided Go program/project. Since we focus on concurrency
-// and message passing we're mainly interested extracting information about
-// channels, function (that uses channels) and, eventually, the 'init' function
-// of the package (for any side effects during module mounting).
-type Package struct {
-	ast.Visitor `json:"-"`          // Implements the ast.Visitor interface (has the Visit(*ast.Node) function)
-	Name        string              `json:"name"`      // Package name or identifier
-	Channels    map[string]Channel  `json:"channels"`  // Channels declared inside the module
-	Functions   map[string]Function `json:"functions"` // Function declared inside the module
-	InitFlow    interface{}         `json:"init_flow"` // TODO: Add FSA package
-}
-
 func (pkg Package) Visit(node ast.Node) ast.Visitor {
 	if node == nil { // Skips leaf/empty nodes in the AST
 		return nil
@@ -40,7 +24,7 @@ func (pkg Package) Visit(node ast.Node) ast.Visitor {
 		pkg.FromFuncDecl(statement)
 		return pkg
 	default:
-		log.Fatalf("Unexpected statement '%T' at pos: %d", statement, node.Pos())
+		log.Infof("Unexpected statement '%T' at pos: %d", statement, node.Pos())
 		return nil
 	}
 }
@@ -49,9 +33,10 @@ func (pkg *Package) FromGenDecl(declaration *ast.GenDecl) {
 	for _, child := range declaration.Specs {
 		switch specific := child.(type) {
 		case *ast.ImportSpec:
-			// TODO: Add module name <-> alias registration
+			// TODO: Add module import recursive parsing support
 			log.Warn("Found ast.ImportSpec in ast.GenDecl")
 		case *ast.ValueSpec:
+			// TODO: Add support for global declaration ('const' and 'var')
 			log.Warn("Found ast.ValueSpec in ast.GenDecl")
 		case *ast.TypeSpec:
 			// TODO: Consider type definition only if it involves metadata.ArgType(s)

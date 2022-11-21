@@ -5,32 +5,10 @@
 package metadata
 
 import (
-	"fmt"
 	"go/ast"
 
 	log "github.com/sirupsen/logrus"
 )
-
-// ----------------------------------------------------------------------------
-// Function
-
-// Represents and stores the information extracted about any given function
-// declared inside a given module. Mainly we're interested in saving the Name
-// of the function and the Channels declared inside its scope. Also quite useful
-// is an approximation of the ControlFlow of the function made with a Finite
-// State Automata (FSA) which, in our case keeps track of Goroutine spawning
-// and send/receive operations on both global and local-scoped channels.
-// Also we keep track of Arguments which are meaningful to the function
-// concurrent execution, some example may be channels, callbacks and waitgroups
-// passed by the caller that may have some side effects on the concurrent
-// system and overall 'Choreography'.
-type Function struct {
-	ast.Visitor `json:"-"`          // Implements the ast.Visitor interface (has the Visit(*ast.Node) function)
-	Name        string              `json:"name"`         // Function name or identifier
-	Arguments   map[string]Argument `json:"arguments"`    // "Meaningful" arguments passed by the caller
-	Channels    map[string]Channel  `json:"channels"`     // Channels declared inside the function scope
-	ControlFlow interface{}         `json:"control_flow"` // TODO: Add FSA package
-}
 
 // Extracts recursively Channel and ControlFlow metadata from the function body.
 // Satisfies the 'ast.Visitor' interface for metadata.Function.
@@ -47,7 +25,6 @@ func (fun *Function) Visit(node ast.Node) ast.Visitor {
 	case *ast.GoStmt:
 		fun.FromGoStmt(statement)
 		return fun
-
 	case *ast.SendStmt:
 		fun.FromSendStmt(statement)
 		return fun
@@ -95,25 +72,21 @@ func (fun *Function) FromAssignStmt(node *ast.AssignStmt) {
 func (fun *Function) FromGoStmt(node *ast.GoStmt) {
 	for _, arg := range node.Call.Args {
 		varIdent, isIdent := arg.(*ast.Ident)
-		chanMeta, exists := fun.Channels[varIdent.Name]
+		_, exists := fun.Channels[varIdent.Name]
 		if !isIdent || !exists {
 			fun.Visit(arg)
 		} else {
-			// tx := Transaction{Op: Send, Channel: ChanMeta}
-			// fun.Scope.AddTx(tx)
-			fmt.Printf("Found channels passed to function %+v \n", chanMeta)
+			// TODO (hmny): Complete this function
 		}
 	}
 }
 
 // Extracts metadata from 'ast.SendStmt' node and updates the relative metadata.
 func (fun *Function) FromSendStmt(node *ast.SendStmt) {
-	chanIdent, isIdent := node.Chan.(*ast.Ident)
+	_, isIdent := node.Chan.(*ast.Ident)
 	if !isIdent {
 		log.Fatalf("Expected ast.Ident in ast.SendStmt but got %T", node)
 	}
 
-	log.Tracef("Found 'Send op' on channel '%s' in function '%s'", chanIdent.Name, fun.Name)
-	// ! sendTransition := SendTransition{Channel: chanIdent.Name}
-	// ! fun.ControlFlow.AddTransition(t)
+	// TODO (hmny): Complete this function
 }
