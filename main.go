@@ -1,6 +1,6 @@
 // Copyright 2020 Enea Guidi (hmny). All rights reserved.
 // This files are distributed under the General Public License v3.0.
-// A copy of abovesaid license can be found in the LICENSE file.
+// A copy of aforesaid license can be found in the LICENSE file.
 
 package main
 
@@ -24,15 +24,15 @@ var metadataCmd = cli.
 	// Arguments, options and flags registrations
 	WithArg(cli.NewArg("input", "The program entrypoint (main.go)").WithType(cli.TypeString)).
 	WithOption(cli.NewOption("output", "Output file path").WithChar('o').WithType(cli.TypeString)).
-	// Registers an handler function that will dispatche the argument to the respective module
+	// Registers an handler function that will dispatch the argument to the respective module
 	WithAction(func(args []string, options map[string]string) int {
-		// Destructures the fields from the respective origins
+		// Destructure the fields from the respective origins
 		input, output := args[0], options["output"]
 
 		// If no output path is not provided then the file is saved in the same
 		// directory as the input with just a different extension (in this case .json)
 		if output == "" {
-			// Error is ignored since it will be catched later on
+			// Error is ignored since it will be caught later on
 			abspath, _ := filepath.Abs(input)
 			// If no output path is provided then a JSON file with the name of the given
 			// input directory will be saved in the current working directory

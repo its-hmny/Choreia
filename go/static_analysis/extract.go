@@ -1,6 +1,6 @@
 // Copyright 2020 Enea Guidi (hmny). All rights reserved.
 // This files are distributed under the General Public License v3.0.
-// A copy of abovesaid license can be found in the LICENSE file.
+// A copy of aforesaid license can be found in the LICENSE file.
 
 // Package static_analysis implements the static analysis and metadata
 // extraction functionalities for the Choreia project.
@@ -49,7 +49,7 @@ func ExtractFromPackage(pkg *ast.Package) (metadata.Package, error) {
 // Parses the given 'path' directory and extracts metadata.PackageMetadata
 // from the resulting AST, if the parsing the fails the function bails out.
 func Extract(path string) (map[string]metadata.Package, error) {
-	// We want to ntercept all errors and fully resolve each Node
+	// We want to intercept all errors and fully resolve each Node
 	flags := parser.DeclarationErrors | parser.SpuriousErrors
 	// Parses the given directory/project and extracts a map of packages available.
 	parsed, err := parser.ParseDir(token.NewFileSet(), path, nil, flags)
@@ -72,7 +72,7 @@ func Extract(path string) (map[string]metadata.Package, error) {
 }
 
 // Extracts the 'metadata.PackageMetadata' and serializes them in JSON format,
-// then writes a new file at 'outputPath'. Bails out at everytime it find an error.
+// then writes a new file at 'outputPath'. Bails out at every time it finds an error.
 func ExtractAndSave(inputPath, outputPath string) (int, error) {
 	// Extracts metadata from the given program
 	metadata, err := Extract(inputPath)
@@ -81,7 +81,7 @@ func ExtractAndSave(inputPath, outputPath string) (int, error) {
 	}
 
 	// Converts the received metadata to JSON format
-	export, err := json.Marshal(metadata)
+	export, err := json.MarshalIndent(metadata, "", "  ")
 	if err != nil {
 		log.Fatal(err)
 	}

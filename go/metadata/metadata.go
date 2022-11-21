@@ -1,6 +1,6 @@
 // Copyright 2020 Enea Guidi (hmny). All rights reserved.
 // This files are distributed under the General Public License v3.0.
-// A copy of abovesaid license can be found in the LICENSE file.
+// A copy of aforesaid license can be found in the LICENSE file.
 
 // Package metadata declares the types used to store metadata about Go's AST nodes.
 package metadata
@@ -23,10 +23,10 @@ const (
 // ----------------------------------------------------------------------------
 // Channel
 
-// Represents and stores informations extracted about any given channel
+// Represents and stores information extracted about any given channel
 // declared throughout the program/source code. We're only interested in
 // the Name (also Identifier) of the channel and the type of the message
-// exchanged through it for visualization pourposes.
+// exchanged through it for visualization purposes.
 type Channel struct {
 	Name    string `json:"chan_name"`     // Channel name or identifier
 	MsgType string `json:"chan_msg_type"` // Type of message exchanged on channel
@@ -35,9 +35,9 @@ type Channel struct {
 // ----------------------------------------------------------------------------
 // Argument
 
-// Represents and stores the informations extracted about any meaningful
+// Represents and stores the information extracted about any meaningful
 // argument declared in the function signature. By meaningful argument we mean
-// an argument which value/initialization may change the Choreograpy of the
+// an argument which value/initialization may change the Choreography of the
 // program. By passing one channel instead of another the function may communicate
 // with a whole different set of Goroutines, the same applies for functions and
 // callbacks and "possibly" WaitGroups.

@@ -1,6 +1,6 @@
 // Copyright 2020 Enea Guidi (hmny). All rights reserved.
 // This files are distributed under the General Public License v3.0.
-// A copy of abovesaid license can be found in the LICENSE file.
+// A copy of aforesaid license can be found in the LICENSE file.
 
 package metadata
 
@@ -14,7 +14,7 @@ import (
 // ----------------------------------------------------------------------------
 // Function
 
-// Represents and stores the informations extracted about any given function
+// Represents and stores the information extracted about any given function
 // declared inside a given module. Mainly we're interested in saving the Name
 // of the function and the Channels declared inside its scope. Also quite useful
 // is an approximation of the ControlFlow of the function made with a Finite
@@ -57,7 +57,7 @@ func (fun *Function) Visit(node ast.Node) ast.Visitor {
 	}
 }
 
-// Extracts metadata from 'ast.AssignStmt' node and updates the relative metatdata.
+// Extracts metadata from 'ast.AssignStmt' node and updates the relative metadata.
 func (fun *Function) FromAssignStmt(node *ast.AssignStmt) {
 	if len(node.Lhs) != len(node.Rhs) {
 		log.Fatalf("Mismatch between LHS and RHS expressions in ast.AssignStmt")
@@ -91,7 +91,7 @@ func (fun *Function) FromAssignStmt(node *ast.AssignStmt) {
 	}
 }
 
-// Extracts metadata from 'ast.GOStmt' node and updates the relative metatdata.
+// Extracts metadata from 'ast.GOStmt' node and updates the relative metadata.
 func (fun *Function) FromGoStmt(node *ast.GoStmt) {
 	for _, arg := range node.Call.Args {
 		varIdent, isIdent := arg.(*ast.Ident)
@@ -106,7 +106,7 @@ func (fun *Function) FromGoStmt(node *ast.GoStmt) {
 	}
 }
 
-// Extracts metadata from 'ast.SendStmt' node and updates the relative metatdata.
+// Extracts metadata from 'ast.SendStmt' node and updates the relative metadata.
 func (fun *Function) FromSendStmt(node *ast.SendStmt) {
 	chanIdent, isIdent := node.Chan.(*ast.Ident)
 	if !isIdent {

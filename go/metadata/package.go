@@ -1,6 +1,6 @@
 // Copyright 2020 Enea Guidi (hmny). All rights reserved.
 // This files are distributed under the General Public License v3.0.
-// A copy of abovesaid license can be found in the LICENSE file.
+// A copy of aforesaid license can be found in the LICENSE file.
 
 package metadata
 
@@ -13,9 +13,9 @@ import (
 // ----------------------------------------------------------------------------
 // Package
 
-// Represents and stores the informations extracted about any given package
+// Represents and stores the information extracted about any given package
 // used inside the provided Go program/project. Since we focus on concurrency
-// and message passing we're mainly interested extracting informations about
+// and message passing we're mainly interested extracting information about
 // channels, function (that uses channels) and, eventually, the 'init' function
 // of the package (for any side effects during module mounting).
 type Package struct {
