@@ -5,47 +5,16 @@
 package main
 
 import (
-	"fmt"
 	"os"
-	"path/filepath"
 
-	analysis "github.com/its-hmny/Choreia/go/static_analysis"
 	log "github.com/sirupsen/logrus"
 	"github.com/teris-io/cli"
+
+	"github.com/choreia/cmd"
 )
 
-// Usage message to print when the user uses the --help flag
-// TODO Further elaborate and document
-const Usage = `Associates a Choreography Automata to your Go program.`
-
-// "metadata" subcommand, extracts the metadata from the given program through static analysis
-var metadataCmd = cli.
-	NewCommand("metadata", "Extracts metadata through static analysis").WithShortcut("meta").
-	// Arguments, options and flags registrations
-	WithArg(cli.NewArg("input", "The program entrypoint (main.go)").WithType(cli.TypeString)).
-	WithOption(cli.NewOption("output", "Output file path").WithChar('o').WithType(cli.TypeString)).
-	// Registers an handler function that will dispatch the argument to the respective module
-	WithAction(func(args []string, options map[string]string) int {
-		// Destructure the fields from the respective origins
-		input, output := args[0], options["output"]
-
-		// If no output path is not provided then the file is saved in the same
-		// directory as the input with just a different extension (in this case .json)
-		if output == "" {
-			// Error is ignored since it will be caught later on
-			abspath, _ := filepath.Abs(input)
-			// If no output path is provided then a JSON file with the name of the given
-			// input directory will be saved in the current working directory
-			basename := filepath.Base(abspath)
-			output = fmt.Sprintf("%s.json", basename)
-		}
-
-		if _, err := analysis.ExtractAndSave(input, output); err != nil {
-			log.Fatal(err)
-		}
-		return 0
-	})
-
+// This function is executed at the first runtime usage of an imported
+// module or (like in this case) before the main() itself is executed.
 func init() {
 	// Log as JSON instead of the default ASCII formatter.
 	log.SetFormatter(&log.TextFormatter{ForceColors: true, FullTimestamp: true, TimestampFormat: "15:04:05"})
@@ -57,7 +26,7 @@ func init() {
 
 func main() {
 	// Builds the CLI app with the respective subcommands
-	app := cli.New(Usage).WithCommand(metadataCmd)
+	app := cli.New(cmd.Usage).WithCommand(cmd.ExtractMeta)
 	// Dispatch the arguments and executes the respective action
 	os.Exit(app.Run(os.Args, os.Stdout))
 }
