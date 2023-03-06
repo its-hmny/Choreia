@@ -1,4 +1,4 @@
-module github.com/its-hmny/Choreia
+module github.com/choreia
 
 go 1.19
 

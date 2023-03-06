@@ -13,7 +13,7 @@ import (
 	"go/token"
 	"os"
 
-	"github.com/its-hmny/Choreia/go/metadata"
+	"github.com/choreia/go/metadata"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -73,7 +73,7 @@ func Extract(path string) (map[string]metadata.Package, error) {
 
 // Extracts the 'metadata.PackageMetadata' and serializes them in JSON format,
 // then writes a new file at 'outputPath'. Bails out at every time it finds an error.
-func ExtractAndSave(inputPath, outputPath string) (int, error) {
+func ExtractAndSave(inputPath, outputPath string) error {
 	// Extracts metadata from the given program
 	metadata, err := Extract(inputPath)
 	if err != nil {
@@ -94,10 +94,10 @@ func ExtractAndSave(inputPath, outputPath string) (int, error) {
 	defer file.Close()
 
 	// Writes the extracted JSON content to said file
-	bytes, err := file.Write(export)
+	_, err = file.Write(export)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	return bytes, nil
+	return nil
 }
